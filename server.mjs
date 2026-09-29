@@ -157,90 +157,190 @@ async function uploadToOpenAI(file) {
   const r = await fetch("https://api.openai.com/v1/files", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: form }); const data = await r.json(); if (!r.ok) throw new Error(data?.error?.message || "파일 업로드 실패"); return data;
 }
 async function deleteOpenAIFile(id) { try { await fetch(`https://api.openai.com/v1/files/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }); } catch {} }
-function parseJsonText(text) { const cleaned = String(text || "").trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim(); return JSON.parse(cleaned); }
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.4" }));
+function extractOutputText(response) {
+  let outputText = "";
+  for (const item of response.output || []) {
+    for (const c of item.content || []) {
+      if (c.type === "output_text") outputText += c.text || "";
+    }
+  }
+  return outputText.trim();
+}
+
+async function createStructuredResponse({ model, content, schemaName, schema, maxOutputTokens = 7000 }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 105000);
+  try {
+    const rr = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        max_output_tokens: maxOutputTokens,
+        input: [{ role: "user", content }],
+        text: {
+          format: {
+            type: "json_schema",
+            name: schemaName,
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+    const response = await rr.json();
+    if (!rr.ok) throw new Error(response?.error?.message || "AI 분석 실패");
+    if (response.status === "incomplete") {
+      throw new Error(`AI 응답이 완성되기 전에 중단되었습니다. ${response?.incomplete_details?.reason || "출력 길이 초과 가능성"}`);
+    }
+    const outputText = extractOutputText(response);
+    if (!outputText) throw new Error("AI가 빈 분석 결과를 반환했습니다.");
+    try {
+      return JSON.parse(outputText);
+    } catch (e) {
+      console.error("Structured output parse failure", { schemaName, length: outputText.length, preview: outputText.slice(-500) });
+      throw new Error(`AI 결과 형식을 읽지 못했습니다. (${e.message})`);
+    }
+  } catch (e) {
+    if (e?.name === "AbortError") throw new Error("AI 분석이 105초를 초과했습니다. 잠시 후 다시 시도해주세요.");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const teachingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary", "overview", "easy_lessons", "topics", "comparisons", "traps", "coverage_note"],
+  properties: {
+    summary: { type: "string" },
+    overview: { type: "array", items: { type: "string" } },
+    easy_lessons: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "why", "easy_explanation", "steps", "example", "terms", "check", "answer"],
+        properties: {
+          title: { type: "string" }, why: { type: "string" }, easy_explanation: { type: "string" },
+          steps: { type: "array", items: { type: "string" } }, example: { type: "string" },
+          terms: { type: "array", items: { type: "object", additionalProperties: false, required: ["term", "meaning"], properties: { term: { type: "string" }, meaning: { type: "string" } } } },
+          check: { type: "string" }, answer: { type: "string" }
+        }
+      }
+    },
+    topics: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "importance", "definition", "principle", "exam_point", "common_trap", "source_basis"],
+        properties: {
+          title: { type: "string" }, importance: { type: "integer" }, definition: { type: "string" }, principle: { type: "string" },
+          exam_point: { type: "string" }, common_trap: { type: "string" }, source_basis: { type: "string" }
+        }
+      }
+    },
+    comparisons: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "items"],
+        properties: {
+          title: { type: "string" },
+          items: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "points"], properties: { name: { type: "string" }, points: { type: "array", items: { type: "string" } } } } }
+        }
+      }
+    },
+    traps: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "explanation"], properties: { title: { type: "string" }, explanation: { type: "string" } } } },
+    coverage_note: { type: "string" }
+  }
+};
+
+const practiceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["written", "quiz", "flashcards"],
+  properties: {
+    written: { type: "array", items: { type: "object", additionalProperties: false, required: ["q", "model_answer", "scoring_points"], properties: { q: { type: "string" }, model_answer: { type: "string" }, scoring_points: { type: "array", items: { type: "string" } } } } },
+    quiz: { type: "array", items: { type: "object", additionalProperties: false, required: ["q", "options", "answer", "explanation"], properties: { q: { type: "string" }, options: { type: "array", items: { type: "string" } }, answer: { type: "integer" }, explanation: { type: "string" } } } },
+    flashcards: { type: "array", items: { type: "object", additionalProperties: false, required: ["front", "back"], properties: { front: { type: "string" }, back: { type: "string" } } } }
+  }
+};
+
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.6" }));
+
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
-  const files = req.files || []; if (!files.length) return res.status(400).json({ error: "분석할 사진/PDF/문서를 1개 이상 선택해주세요." });
-  const { subject = "통합과학", materialType = "학교 프린트", memo = "", examRange = "" } = req.body || {}; const uploaded = []; let originals=[];
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: "분석할 사진/PDF/문서를 1개 이상 선택해주세요." });
+  const { subject = "통합과학", materialType = "학교 프린트", memo = "", examRange = "" } = req.body || {};
+  const uploaded = [];
+  let originals=[];
+  const started = Date.now();
   try {
     originals = await saveOriginalFiles(req.user, files);
     for (const file of files) uploaded.push(await uploadToOpenAI(file));
-    const prompt = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 매우 꼼꼼한 1:1 과외 선생님입니다.
-과목: ${subject}
-자료 종류: ${materialType}
-시험 범위: ${examRange || "미입력"}
-사용자 메모: ${memo || "없음"}
+    const model = process.env.OPENAI_MODEL || "gpt-6-luna";
+    const fileContent = uploaded.map(f => ({ type: "input_file", file_id: f.id }));
 
-가장 중요한 목표는 문제를 빨리 만드는 것이 아니라, 학생이 교과서와 첨부자료의 내용을 처음부터 끝까지 이해하도록 쉽게 설명하는 것입니다. 첨부된 교과서, 학교 프린트, 수업 필기, 사진, PDF, 문서에 나온 내용을 빠뜨리지 말고 학습 순서대로 재구성하세요.
+    const teachingPrompt = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 꼼꼼한 1:1 과외 선생님입니다.
+과목: ${subject}\n자료 종류: ${materialType}\n시험 범위: ${examRange || "미입력"}\n사용자 메모: ${memo || "없음"}
 
-설명 원칙:
-1) 먼저 전체 흐름을 잡아주세요. '이 단원에서 무엇을 배우는지 → 왜 배우는지 → 앞뒤 개념이 어떻게 연결되는지' 순서로 설명합니다.
-2) 어려운 용어가 나오면 바로 쉬운 한국어로 뜻을 풀고, 가능한 경우 일상적인 예시나 비유를 붙입니다. 단, 비유가 실제 개념과 다른 부분은 분명히 구분합니다.
-3) 단순 정의 암기보다 '왜 그런지', '어떤 과정으로 그렇게 되는지', '그래서 무엇이 달라지는지'를 설명합니다.
-4) 교과서/첨부자료의 소제목, 문단, 표, 그림 설명, 공식, 사례, 선생님 표시 내용이 확인되면 빠뜨리지 말고 easy_lessons에 포함합니다.
-5) 학생이 혼자 읽어도 이해되도록 문장을 짧고 자연스럽게 쓰고, 한 문단에 너무 많은 정보를 몰아넣지 마세요.
-6) 과목별 설명 방식도 바꾸세요.
-   - 과학: 현상 → 원인 → 과정 → 결과 → 실제 예
-   - 수학: 개념 뜻 → 공식이 왜 나오는지 → 풀이 순서 → 대표 예제 → 실수 포인트
-   - 영어: 문장 뜻 → 핵심 단어 → 문법 구조 → 자연스러운 해석 → 시험 포인트
-   - 국어: 글/작품의 흐름 → 핵심 문장 → 표현/문법 → 주제 → 문제 포인트
-   - 역사/사회: 시간·원인 → 사건/개념 → 결과 → 서로의 관계 → 비교
-7) 첨부자료에 없는 학교 고유 출제경향, 선생님 의도, 사실을 추측하지 마세요. 필요한 경우 '자료에서 직접 확인되지 않음'이라고 적습니다.
-8) 학생이 '이 설명만 읽어도 원자료의 핵심 내용을 이해할 수 있다'고 느낄 정도로 충분히 자세히 설명합니다.
-9) 시험 대비는 이해 설명 뒤에 배치합니다. 이해 → 핵심정리 → 암기 → 문제 순서입니다.
-10) JSON 이외의 문장은 절대 출력하지 마세요.
+최우선 목표는 학생이 첨부된 교과서/학교 프린트/필기/사진/PDF의 내용을 처음부터 끝까지 쉽게 이해하는 것입니다.
+- 자료의 흐름 순서대로 설명하세요.
+- 어려운 용어는 바로 쉬운 말로 풀이하세요.
+- 정의만 말하지 말고 왜 그런지, 과정이 무엇인지, 결과가 무엇인지 설명하세요.
+- 표/그림/공식/사례/강조표시가 읽히면 설명에 반영하세요.
+- 자료에 없는 사실이나 선생님 의도는 추측하지 마세요.
+- 과학은 현상→원인→과정→결과→예시, 수학은 개념→공식 이유→풀이 순서→예제→실수, 영어는 뜻→단어→문법→해석→시험포인트, 역사/사회는 원인→사건→결과→관계→비교 순서를 기본으로 하세요.
+- summary는 8~12문장, overview 6~10개, easy_lessons 5~12개, topics 6~12개, traps 3~8개 정도로 충분하지만 불필요하게 장황하지 않게 작성하세요.
+- easy_lessons의 easy_explanation은 학생이 원자료를 다시 보지 않아도 핵심 흐름을 이해할 정도로 구체적으로 작성하세요.`;
 
-반드시 아래 JSON 구조로 반환하세요.
-{
-  "summary": "이 자료/단원의 전체 내용을 학생 눈높이에서 10~18문장으로 연결해 설명한 전체 설명",
-  "overview": ["전체 흐름을 잡는 쉬운 문장 1", "쉬운 문장 2"],
-  "easy_lessons": [
-    {
-      "title":"교과서/자료의 소단원 또는 설명 주제",
-      "why":"이 내용을 배우는 이유 또는 앞뒤 개념과의 연결",
-      "easy_explanation":"학생에게 말하듯 아주 쉽게 풀어쓴 충분한 설명. 필요하면 여러 문장 사용",
-      "steps":["과정/순서 1","과정/순서 2"],
-      "example":"이해를 돕는 교과서 속 사례 또는 안전한 일상 예시",
-      "terms":[{"term":"어려운 용어","meaning":"쉬운 뜻"}],
-      "check":"이 내용을 이해했는지 스스로 확인할 짧은 질문",
-      "answer":"확인 질문의 짧은 답"
-    }
-  ],
-  "topics": [
-    {
-      "title":"핵심 개념명",
-      "importance":5,
-      "definition":"정의 또는 무엇인지 쉽게 2~5문장",
-      "principle":"왜/어떻게 그런지 원리·과정·인과관계 3~7문장",
-      "exam_point":"시험에서 구분하거나 설명해야 할 포인트",
-      "common_trap":"학생이 자주 헷갈리는 부분과 정확한 구분",
-      "source_basis":"첨부자료에서 이 개념이 중요하다고 판단한 근거"
-    }
-  ],
-  "comparisons": [
-    {"title":"비교 주제","items":[{"name":"개념 A","points":["특징1","특징2"]},{"name":"개념 B","points":["특징1","특징2"]}]}
-  ],
-  "traps": [{"title":"헷갈리는 포인트","explanation":"무엇이 어떻게 다른지 쉬운 말로 설명"}],
-  "written": [{"q":"서술형 예상 질문","model_answer":"고1 학생이 실제 시험에 쓸 수 있는 모범답안","scoring_points":["채점포인트1","채점포인트2"]}],
-  "quiz": [{"q":"객관식 문제","options":["보기1","보기2","보기3","보기4"],"answer":0,"explanation":"정답 이유와 오답이 틀린 이유를 학생 눈높이로 설명"}],
-  "flashcards": [{"front":"10초 암기 질문","back":"짧고 정확한 정답"}],
-  "coverage_note":"자료가 흐리거나 일부 내용을 읽지 못했을 때만 한계 설명, 아니면 빈 문자열"
-}
+    const teaching = await createStructuredResponse({
+      model,
+      content: [{ type: "input_text", text: teachingPrompt }, ...fileContent],
+      schemaName: "examkok_teaching",
+      schema: teachingSchema,
+      maxOutputTokens: 6500
+    });
 
-분량 기준:
-- overview 8~15개
-- easy_lessons: 첨부자료의 주요 소단원/문단 흐름을 빠뜨리지 않도록 6~20개. 자료가 길면 20개까지 충분히 사용
-- topics 8~18개(자료가 짧으면 최소 5개)
-- comparisons 0~6개, traps 4~12개, written 4~8개, quiz 8~12개, flashcards 8~15개
-- importance는 1~5, answer는 0부터 시작하는 보기 인덱스
-- 자료가 교과서라면 시험 범위 안의 내용을 가능한 한 전체적으로 설명하고, 프린트/필기/기타 첨부자료도 동일한 수준으로 쉽게 설명하세요.`;
-    const content = [{ type: "input_text", text: prompt }]; for (const f of uploaded) content.push({ type: "input_file", file_id: f.id });
-    const rr = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-6-luna", max_output_tokens: 9000, input: [{ role: "user", content }] }) });
-    const response = await rr.json(); if (!rr.ok) throw new Error(response?.error?.message || "AI 분석 실패");
-    let outputText = ""; for (const item of response.output || []) for (const c of item.content || []) if (c.type === "output_text") outputText += c.text || "";
-    const result=parseJsonText(outputText); res.json({ ok: true, result, originals, analysis:{id:crypto.randomUUID(),subject,materialType,memo,examRange,createdAt:new Date().toISOString(),fileCount:files.length,summary:result.summary||""} });
-  } catch (e) { res.status(500).json({ error: e.message || "분석 중 오류가 발생했습니다." }); }
-  finally { await Promise.all(uploaded.map(f => deleteOpenAIFile(f.id))); }
+    const compactContext = JSON.stringify({
+      subject,
+      summary: teaching.summary,
+      overview: teaching.overview,
+      topics: teaching.topics.map(t => ({ title:t.title, definition:t.definition, principle:t.principle, exam_point:t.exam_point, common_trap:t.common_trap }))
+    });
+    const practicePrompt = `아래는 첨부 학습자료를 바탕으로 만든 핵심 설명입니다. 이 내용에만 근거해서 시험 대비 문제와 암기카드를 만드세요. 자료에 없는 사실은 추가하지 마세요.
+${compactContext}
+
+요구사항:
+- written 3~5개: 고1 시험에 쓸 수 있는 서술형 질문, 모범답안, 채점포인트
+- quiz 6~8개: 보기 4개, answer는 0~3 정수, 해설에는 정답 이유와 대표 오답 이유
+- flashcards 8~12개: 10초 안에 확인할 수 있는 짧고 정확한 문답`;
+
+    const practice = await createStructuredResponse({
+      model,
+      content: [{ type: "input_text", text: practicePrompt }],
+      schemaName: "examkok_practice",
+      schema: practiceSchema,
+      maxOutputTokens: 4500
+    });
+
+    const result = { ...teaching, ...practice };
+    console.log(`[analyze] ok subject=${subject} files=${files.length} ms=${Date.now()-started}`);
+    res.json({ ok: true, result, originals, analysis:{id:crypto.randomUUID(),subject,materialType,memo,examRange,createdAt:new Date().toISOString(),fileCount:files.length,summary:result.summary||""} });
+  } catch (e) {
+    console.error(`[analyze] failed subject=${subject} files=${files.length} ms=${Date.now()-started}`, e);
+    res.status(500).json({ error: e.message || "분석 중 오류가 발생했습니다." });
+  } finally {
+    await Promise.all(uploaded.map(f => deleteOpenAIFile(f.id)));
+  }
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Alexpapa 시험콕 V9.5.1</title>
+<title>Alexpapa 시험콕 V9.6</title>
 <meta name="theme-color" content="#3b82f6" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -37,7 +37,7 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 </div>
 
 <div class="app">
-  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.5.1 쉽게 이해하는 교과서·자료 학습</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
+  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.6 2단계 AI 학습분석</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
 
   <section id="home" class="screen active">
     <div class="card hero"><div class="small" id="examLabel">2학기 중간고사</div><div class="d" id="dDay">시험일 미설정</div><div id="examMeta" class="small">시험을 등록하면 D-Day와 범위를 관리할 수 있어요.</div></div>
@@ -144,7 +144,7 @@ async function addMaterial(){
    const controller=new AbortController();
    let elapsed=0;
    const timer=setInterval(()=>{elapsed+=1;if(btn)btn.textContent=`AI 분석 중... ${elapsed}초`;},1000);
-   const timeout=setTimeout(()=>controller.abort(),120000);
+   const timeout=setTimeout(()=>controller.abort(),180000);
    let r;
    try{r=await fetch('/api/analyze',{method:'POST',body:fd,signal:controller.signal});}
    finally{clearInterval(timer);clearTimeout(timeout);}
