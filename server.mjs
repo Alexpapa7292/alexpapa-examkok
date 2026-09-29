@@ -275,30 +275,51 @@ const practiceSchema = {
   }
 };
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.7" }));
+const CONFIRMED_REFERENCE_MATERIALS={
+  "공통수학2": [
+    "마더텅 기출문제집 원본 확인. 시험범위는 p4 평면좌표부터 p165 집합, 그리고 p304~p321. 확인된 초반 내용에는 평면좌표, 두 점 사이의 거리, 선분의 내분, 삼각형의 무게중심 문제 등이 포함된다."
+  ],
+  "통합사회2": [
+    "지리 1차 수업자료 확인: 세계 주요 종교의 분포와 특징, 문화권, 세계화와 지역화 관련 내용.",
+    "3단원 수업노트1 확인: 시장경제와 지속가능발전, 자본주의의 의미와 특징, 상업 자본주의·산업 자본주의·수정 자본주의·신자유주의, 경제 체제 비교.",
+    "3단원 수업노트2 확인: 경제 체제에 따른 다양한 삶의 방식, 전통·계획·시장·혼합 경제 체제, 효율성과 형평성.",
+    "수업노트3 확인: 합리적 선택과 경제 주체의 역할, 생산·분배·소비, 희소성, 편익·기회비용·매몰비용, 가계·기업·정부의 역할, 시장 실패."
+  ],
+  "통합과학2": [
+    "하남고 지구과학 프린트 확인: 지질 시대의 환경과 생물. 화석의 생성, 시상 화석과 표준 화석, 지질 시대의 구분, 선캄브리아·고생대 등 환경과 생물 변화.",
+    "하남고 지구과학 프린트 확인: 지구 환경 변화와 인간 생활. 지구 복사 평형과 온실 효과, 지구 열수지, 지구 온난화, 대기 대순환과 해수 표층 순환, 엘니뇨와 사막화."
+  ]
+};
+function confirmedReferenceText(subject){return (CONFIRMED_REFERENCE_MATERIALS[subject]||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");}
+
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.10" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
-  if (!files.length) return res.status(400).json({ error: "분석할 사진/PDF/문서를 1개 이상 선택해주세요." });
-  const { subject = "통합과학", materialType = "학교 프린트", memo = "", examRange = "" } = req.body || {};
+  const { subject = "통합과학", materialType = "학교 프린트", memo = "", examRange = "", textbookInfo = "" } = req.body || {};
+  const confirmedReference = confirmedReferenceText(subject);
   const uploaded = [];
   let originals=[];
   const started = Date.now();
   try {
-    originals = await saveOriginalFiles(req.user, files);
+    if (files.length) originals = await saveOriginalFiles(req.user, files);
     for (const file of files) uploaded.push(await uploadToOpenAI(file));
     const model = process.env.OPENAI_MODEL || "gpt-6-luna";
     const fileContent = uploaded.map(f => ({ type: "input_file", file_id: f.id }));
 
     const teachingPrompt = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 꼼꼼한 1:1 과외 선생님입니다.
-과목: ${subject}\n자료 종류: ${materialType}\n시험 범위: ${examRange || "미입력"}\n사용자 메모: ${memo || "없음"}
+과목: ${subject}\n자료 종류: ${materialType}\n시험 범위: ${examRange || "미입력"}\n확인된 교과서 정보: ${textbookInfo || "미등록"}\n확인된 학교자료 참고정보: ${confirmedReference || "미등록"}\n첨부자료 상태: ${files.length ? `첨부 ${files.length}개 있음` : "첨부 없음 - 시험범위와 교과 일반지식 기반으로 설명"}\n사용자 메모: ${memo || "없음"}
 
 최우선 목표는 학생이 첨부된 교과서/학교 프린트/필기/사진/PDF의 내용을 처음부터 끝까지 쉽게 이해하는 것입니다.
+시험범위에 부교재·프린트·수업노트가 포함되어 있어도 실제 파일이 첨부되지 않았다면 그 자료의 구체적 문장·문제·표·그림을 추정하거나 만들어내지 마세요. 범위에 포함된다는 사실만 표시하고, 첨부 후 정밀 분석이 가능하다고 안내하세요.
+시험범위에 전국연합학력평가가 포함된 경우 반드시 별도의 시험범위로 인식하세요. 다만 해당 시험지 원문이 첨부되지 않았다면 실제 지문이나 문항 내용을 본 것처럼 재현하거나 추정하지 마세요. 첨부된 시험지가 있으면 그 파일을 최우선 근거로 분석하세요.
 - 자료의 흐름 순서대로 설명하세요.
 - 어려운 용어는 바로 쉬운 말로 풀이하세요.
 - 정의만 말하지 말고 왜 그런지, 과정이 무엇인지, 결과가 무엇인지 설명하세요.
 - 표/그림/공식/사례/강조표시가 읽히면 설명에 반영하세요.
-- 자료에 없는 사실이나 선생님 의도는 추측하지 마세요.
+- 자료가 첨부된 경우에는 자료에 없는 사실이나 선생님 의도는 추측하지 마세요.
+- 첨부자료가 없으면 시험범위, 확인된 교과서 정보, 위의 확인된 학교자료 참고정보, 2022 개정 교육과정의 일반 교과지식을 바탕으로 설명하세요. 확인된 학교자료 참고정보는 사용자가 제공한 원본에서 확인된 요약이므로 그 범위 안에서는 근거로 사용할 수 있습니다. 다만 원문 문장, 정확한 표 수치, 문제 문항을 실제 파일을 다시 본 것처럼 재현하지 마세요.
+- 첨부자료가 없을 때 coverage_note에는 반드시 “첨부자료 없음 · 교과 일반지식 기반”이라는 취지를 명확히 적으세요.
 - 과학은 현상→원인→과정→결과→예시, 수학은 개념→공식 이유→풀이 순서→예제→실수, 영어는 뜻→단어→문법→해석→시험포인트, 역사/사회는 원인→사건→결과→관계→비교 순서를 기본으로 하세요.
 - summary는 8~12문장, overview 6~10개, easy_lessons 5~12개, topics 6~12개, traps 3~8개 정도로 충분하지만 불필요하게 장황하지 않게 작성하세요.
 - easy_lessons의 easy_explanation은 학생이 원자료를 다시 보지 않아도 핵심 흐름을 이해할 정도로 구체적으로 작성하세요.`;
@@ -335,7 +356,7 @@ ${compactContext}
 
     const result = { ...teaching, ...practice };
     console.log(`[analyze] ok subject=${subject} files=${files.length} ms=${Date.now()-started}`);
-    res.json({ ok: true, result, originals, analysis:{id:crypto.randomUUID(),subject,materialType,memo,examRange,createdAt:new Date().toISOString(),fileCount:files.length,summary:result.summary||""} });
+    res.json({ ok: true, result, originals, analysis:{id:crypto.randomUUID(),subject,materialType,memo,examRange,textbookInfo,createdAt:new Date().toISOString(),fileCount:files.length,summary:result.summary||""} });
   } catch (e) {
     console.error(`[analyze] failed subject=${subject} files=${files.length} ms=${Date.now()-started}`, e);
     res.status(500).json({ error: e.message || "분석 중 오류가 발생했습니다." });
@@ -345,7 +366,7 @@ ${compactContext}
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.7: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.10: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
