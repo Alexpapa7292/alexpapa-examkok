@@ -124,6 +124,7 @@ app.post('/api/auth/logout',(_req,res)=>{clearSession(res);res.json({ok:true});}
 app.get('/api/auth/me',auth,(req,res)=>res.json({user:{email:req.user.email,name:req.user.name}}));
 app.get('/api/state',auth,async(req,res)=>{try{res.json({state:await getState(req.user)});}catch(e){res.status(500).json({error:e.message||'학습 데이터를 불러오지 못했습니다.'});}});
 app.put('/api/state',auth,async(req,res)=>{try{await putState(req.user,req.body?.state||{});res.json({ok:true});}catch(e){res.status(500).json({error:e.message||'학습 데이터를 저장하지 못했습니다.'});}});
+app.post('/api/materials/delete-originals',auth,async(req,res)=>{try{const originals=Array.isArray(req.body?.originals)?req.body.originals:[];for(const o of originals){const key=String(o?.key||'');if(!key||!key.startsWith(req.user.uid+'/'))continue;if(o.storage==='supabase'&&cloudEnabled){const {error}=await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([key]);if(error)throw error;}else if(o.storage==='local'){const full=path.join(UPLOAD_DIR,key);if(full.startsWith(path.join(UPLOAD_DIR,req.user.uid))&&fs.existsSync(full))fs.unlinkSync(full);}}res.json({ok:true});}catch(e){console.error('delete originals failed',e);res.status(500).json({error:e.message||'원본 자료 삭제 중 오류가 발생했습니다.'});}});
 
 
 function safeName(name){ return String(name||"file").replace(/[^a-zA-Z0-9._가-힣-]+/g,"_").slice(-120); }
@@ -274,7 +275,7 @@ const practiceSchema = {
   }
 };
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.6" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.7" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
@@ -344,7 +345,7 @@ ${compactContext}
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.5.1: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.7: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
