@@ -292,7 +292,7 @@ const CONFIRMED_REFERENCE_MATERIALS={
 };
 function confirmedReferenceText(subject){return (CONFIRMED_REFERENCE_MATERIALS[subject]||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");}
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.10" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.11" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
@@ -321,16 +321,31 @@ app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req
 - 첨부자료가 없으면 시험범위, 확인된 교과서 정보, 위의 확인된 학교자료 참고정보, 2022 개정 교육과정의 일반 교과지식을 바탕으로 설명하세요. 확인된 학교자료 참고정보는 사용자가 제공한 원본에서 확인된 요약이므로 그 범위 안에서는 근거로 사용할 수 있습니다. 다만 원문 문장, 정확한 표 수치, 문제 문항을 실제 파일을 다시 본 것처럼 재현하지 마세요.
 - 첨부자료가 없을 때 coverage_note에는 반드시 “첨부자료 없음 · 교과 일반지식 기반”이라는 취지를 명확히 적으세요.
 - 과학은 현상→원인→과정→결과→예시, 수학은 개념→공식 이유→풀이 순서→예제→실수, 영어는 뜻→단어→문법→해석→시험포인트, 역사/사회는 원인→사건→결과→관계→비교 순서를 기본으로 하세요.
-- summary는 8~12문장, overview 6~10개, easy_lessons 5~12개, topics 6~12개, traps 3~8개 정도로 충분하지만 불필요하게 장황하지 않게 작성하세요.
+- summary는 5~7문장, overview 5~7개, easy_lessons 4~7개, topics 5~8개, traps 3~5개로 핵심을 충분히 설명하되 출력이 지나치게 길어지지 않게 작성하세요.
 - easy_lessons의 easy_explanation은 학생이 원자료를 다시 보지 않아도 핵심 흐름을 이해할 정도로 구체적으로 작성하세요.`;
 
-    const teaching = await createStructuredResponse({
-      model,
-      content: [{ type: "input_text", text: teachingPrompt }, ...fileContent],
-      schemaName: "examkok_teaching",
-      schema: teachingSchema,
-      maxOutputTokens: 6500
-    });
+    let teaching;
+    try {
+      teaching = await createStructuredResponse({
+        model,
+        content: [{ type: "input_text", text: teachingPrompt }, ...fileContent],
+        schemaName: "examkok_teaching",
+        schema: teachingSchema,
+        maxOutputTokens: 7000
+      });
+    } catch (firstError) {
+      const msg=String(firstError?.message||"");
+      if (!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw firstError;
+      console.warn(`[analyze] teaching retry compact subject=${subject}: ${msg}`);
+      const compactPrompt = teachingPrompt + `\n\n[재시도 지침] 이전 응답이 출력 길이 한도를 넘었습니다. 반드시 더 압축해서 작성하세요. summary 4~5문장, overview 5개, easy_lessons 정확히 4개, topics 정확히 5개, comparisons 최대 2개, traps 3개로 제한하세요. 각 설명은 핵심만 2~4문장으로 작성하세요.`;
+      teaching = await createStructuredResponse({
+        model,
+        content: [{ type: "input_text", text: compactPrompt }, ...fileContent],
+        schemaName: "examkok_teaching_compact",
+        schema: teachingSchema,
+        maxOutputTokens: 6500
+      });
+    }
 
     const compactContext = JSON.stringify({
       subject,
@@ -346,13 +361,19 @@ ${compactContext}
 - quiz 6~8개: 보기 4개, answer는 0~3 정수, 해설에는 정답 이유와 대표 오답 이유
 - flashcards 8~12개: 10초 안에 확인할 수 있는 짧고 정확한 문답`;
 
-    const practice = await createStructuredResponse({
-      model,
-      content: [{ type: "input_text", text: practicePrompt }],
-      schemaName: "examkok_practice",
-      schema: practiceSchema,
-      maxOutputTokens: 4500
-    });
+    let practice={written:[],quiz:[],flashcards:[]};
+    try {
+      practice = await createStructuredResponse({
+        model,
+        content: [{ type: "input_text", text: practicePrompt }],
+        schemaName: "examkok_practice",
+        schema: practiceSchema,
+        maxOutputTokens: 4200
+      });
+    } catch (practiceError) {
+      console.warn(`[analyze] practice generation skipped subject=${subject}:`, practiceError?.message||practiceError);
+      teaching.coverage_note = `${teaching.coverage_note||''} 문제/암기카드 생성은 출력 한도 또는 시간 문제로 생략되었습니다. 핵심 설명은 정상 저장되었습니다.`.trim();
+    }
 
     const result = { ...teaching, ...practice };
     console.log(`[analyze] ok subject=${subject} files=${files.length} ms=${Date.now()-started}`);
@@ -366,7 +387,7 @@ ${compactContext}
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.10: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.11: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
