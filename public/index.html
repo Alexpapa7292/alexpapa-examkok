@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Alexpapa 시험콕 V9.9.1</title>
+<title>Alexpapa 시험콕 V9.12</title>
 <meta name="theme-color" content="#3b82f6" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -19,6 +19,7 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 .nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.97);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:9}.navin{width:min(720px,100%);display:grid;grid-template-columns:repeat(5,1fr);padding:8px}.nav button{border:0;background:none;padding:8px 4px;font-size:12px;color:#64748b;cursor:pointer}.nav button.active{color:#2563eb;font-weight:900}.screen{display:none}.screen.active{display:block}.progress{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:#3b82f6}.qopt{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;margin-top:8px;cursor:pointer}.qopt.correct{border-color:#10b981;background:#ecfdf5}.qopt.wrong{border-color:#ef4444;background:#fef2f2}.notice{padding:12px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);font-size:13px}.empty{text-align:center;color:var(--muted);padding:26px 10px}.filebox{border:1px dashed #9db5d4;border-radius:14px;padding:18px;text-align:center;background:#f8fbff}.metric{font-size:28px;font-weight:900}.dashgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.barrow{display:grid;grid-template-columns:64px 1fr 48px;gap:8px;align-items:center;margin-top:8px}.miniBar{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}.miniBar i{display:block;height:100%;background:#3b82f6}.history{display:grid;gap:8px}.deep-section{margin-top:12px}.deep-title{font-size:15px;font-weight:900;margin:16px 0 8px}.bullet{padding-left:20px;margin:6px 0;line-height:1.6}.detail-grid{display:grid;gap:10px}.detail-row{padding:11px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);line-height:1.55}.detail-row strong{display:block;margin-bottom:3px}.compare-box{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:9px}.compare-head{padding:10px 12px;background:#eff6ff;font-weight:900}.compare-item{padding:10px 12px;border-top:1px solid var(--line)}.qa{border-left:4px solid #8b5cf6;padding:10px 12px;background:#faf7ff;border-radius:10px;margin-top:9px}.warnbox{padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;margin-top:10px;line-height:1.55}@media(max-width:520px){.dashgrid{grid-template-columns:1fr 1fr}.top{align-items:flex-start}.userbox{flex-wrap:wrap;justify-content:flex-end}}
 
 .study-subject-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:thin}.study-subject-tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 14px;white-space:nowrap;font-weight:800;color:#475569;cursor:pointer}.study-subject-tabs button.on{background:#2563eb;color:#fff;border-color:#2563eb}.subject-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.subject-head .range{white-space:pre-line;line-height:1.6}.subject-materials .item{padding:10px 12px}
+.study-type-tabs{display:flex;gap:7px;overflow-x:auto;padding:4px 0 2px;scrollbar-width:thin}.study-type-tabs button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 11px;white-space:nowrap;font-weight:800;color:#475569;cursor:pointer;font-size:10.5pt}.study-type-tabs button.on{background:#172033;color:#fff;border-color:#172033}.study-content{font-size:10.5pt;line-height:1.75}.study-content .item,.study-content .detail-row,.study-content .notice,.study-content .qa,.study-content .warnbox{font-size:10.5pt}.study-content .small{font-size:9.5pt}.important-red{color:#dc2626!important;font-weight:900}.exam-redbox{background:#fff1f2!important;border:1px solid #fecdd3!important;border-left:5px solid #dc2626!important;color:#7f1d1d}.study-divider{height:1px;background:var(--line);margin:12px 0}.source-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#f1f5f9;font-size:9.5pt;font-weight:800;margin-right:5px}.app{padding-bottom:140px!important}@media(max-width:520px){.study-content{font-size:10.5pt}.app{padding-bottom:150px!important}}
 </style>
 
 <style>
@@ -41,7 +42,7 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 </div>
 
 <div class="app">
-  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.11 학교 프린트 반영 · 교과서/학교자료 우선 학습</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
+  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.12 과목·자료별 학습 · 심화 설명</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
 
   <section id="home" class="screen active">
     <div class="card hero"><div class="small" id="examLabel">2학기 중간고사</div><div class="d" id="dDay">시험일 미설정</div><div id="examMeta" class="small">시험을 등록하면 D-Day와 범위를 관리할 수 있어요.</div></div>
@@ -77,18 +78,18 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
   </section>
 
   <section id="study" class="screen">
-    <div class="card"><div class="section-title">과목별 공부</div><div id="studySubjectTabs" class="study-subject-tabs"></div><div class="subject-head"><div><b id="studySubjectTitle">공통국어2</b><div id="studySubjectRange" class="small range" style="margin-top:6px"></div></div><span class="pill" id="studySubjectAnalysisCount">분석 0건</span></div></div>
-    <div class="card"><div class="section-title">이 과목 등록자료</div><div id="studySubjectMaterials" class="list subject-materials"></div></div>
-    <div class="card"><div class="section-title">📘 교과서·자료 쉽게 이해하기</div><div class="notice">선택한 과목의 최근 AI 분석을 보여줍니다. 첨부자료가 있으면 그 자료를 최우선으로 설명하고, 첨부가 없으면 시험범위·확인된 교과서 정보와 교과 일반지식을 바탕으로 학습합니다.</div><div id="easyLessons" class="list" style="margin-top:12px"></div></div>
-    <div class="card"><div class="section-title">AI 핵심정리</div><div id="aiSummary" class="notice">자료를 올리면 AI가 첨부 자료의 전체 흐름을 쉽게 설명하고 시험 핵심을 정리합니다.</div><div id="aiOverview" class="deep-section"></div></div>
-    <div class="card"><div class="section-title">이 자료에서 꼭 공부할 것</div>
+    <div class="card"><div class="section-title">과목별 공부</div><div id="studySubjectTabs" class="study-subject-tabs"></div><div class="subject-head"><div><b id="studySubjectTitle">공통국어2</b><div id="studySubjectRange" class="small range" style="margin-top:6px"></div></div><span class="pill" id="studySubjectAnalysisCount">분석 0건</span></div><div class="study-divider"></div><div class="small" style="font-weight:800;margin-bottom:6px">자료별로 골라서 공부하기</div><div id="studyTypeTabs" class="study-type-tabs"></div></div>
+    <div class="card study-content"><div class="section-title">선택한 자료</div><div id="studySourceGuide" class="notice"></div><div id="studySubjectMaterials" class="list subject-materials" style="margin-top:10px"></div></div>
+    <div class="card study-content"><div class="section-title">📘 교과서·자료 쉽게 이해하기</div><div class="notice">선택한 과목의 최근 AI 분석을 보여줍니다. 첨부자료가 있으면 그 자료를 최우선으로 설명하고, 첨부가 없으면 시험범위·확인된 교과서 정보와 교과 일반지식을 바탕으로 학습합니다.</div><div id="easyLessons" class="list" style="margin-top:12px"></div></div>
+    <div class="card study-content"><div class="section-title">AI 핵심정리</div><div id="aiSummary" class="notice">자료를 올리면 AI가 첨부 자료의 전체 흐름을 쉽게 설명하고 시험 핵심을 정리합니다.</div><div id="aiOverview" class="deep-section"></div></div>
+    <div class="card study-content"><div class="section-title">이 자료에서 꼭 공부할 것</div>
       <div class="grid"><div class="item"><div class="metric" id="mustCount" style="color:#ef4444">0</div><b>★★★★★ 반드시 암기</b></div><div class="item"><div class="metric" id="importantCount" style="color:#f59e0b">0</div><b>★★★★ 중요 개념</b></div></div>
       <div id="topics" class="list" style="margin-top:12px"></div>
       <button class="btn primary" style="width:100%;margin-top:12px" onclick="startQuiz()">문제 풀기</button>
     </div>
-    <div class="card"><div class="section-title">헷갈리는 개념 비교</div><div id="comparisons"></div><div id="traps"></div></div>
-    <div class="card"><div class="section-title">서술형 대비</div><div id="writtenQA"></div></div>
-    <div class="card"><div class="section-title">AI 분석 이력</div><div id="analysisHistory" class="history"></div></div>
+    <div class="card study-content"><div class="section-title">헷갈리는 개념 비교</div><div id="comparisons"></div><div id="traps"></div></div>
+    <div class="card study-content"><div class="section-title">서술형 대비</div><div id="writtenQA"></div></div>
+    <div class="card study-content"><div class="section-title">AI 분석 이력</div><div id="analysisHistory" class="history"></div></div>
   </section>
 
   <section id="quiz" class="screen">
@@ -109,21 +110,32 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 
 <div class="nav"><div class="navin"><button data-go="home" class="active" onclick="go('home')">⌂<br>홈</button><button data-go="materials" onclick="go('materials')">▣<br>자료</button><button data-go="study" onclick="go('study')">▤<br>공부</button><button data-go="wrong" onclick="go('wrong')">↺<br>오답</button><button data-go="final" onclick="go('final')">⚡<br>직전</button></div></div>
 <script>
-const SKEY='alexpapa_examkok_v911_cache';
+const SKEY='alexpapa_examkok_v912_cache';
 let state=JSON.parse(localStorage.getItem(SKEY)||'{"exam":{},"materials":[],"wrong":[],"ai":null,"analyses":[],"stats":{"attempts":0,"correct":0,"bySubject":{}}}');
 function normalizeState(){state.exam=state.exam||{};state.materials=state.materials||[];state.wrong=state.wrong||[];state.analyses=state.analyses||[];state.stats=state.stats||{attempts:0,correct:0,bySubject:{}};state.stats.bySubject=state.stats.bySubject||{};}
 normalizeState();
 const STUDY_SUBJECTS=['공통국어2','공통수학2','공통영어2','한국사2','통합사회2','통합과학2'];
 let studySubject=(state.analyses?.[0]?.subject)||'공통국어2';
-function selectedAnalysis(){normalizeState();const hit=state.analyses.find(a=>a.subject===studySubject&&a.result);if(hit)return hit.result;const latest=state.analyses?.[0];if(latest?.subject===studySubject&&state.ai)return state.ai;return null;}
-function setStudySubject(subject){studySubject=subject;renderStudySubject();renderTopics();renderAnalysisHistory();}
+const STUDY_TYPES=['전체','교과서','학교 프린트','부교재','전국연합학력평가'];
+let studyType='전체';
+function normalizeStudyType(v=''){const x=String(v);if(/전국|모의/.test(x))return '전국연합학력평가';if(/교과서/.test(x))return '교과서';if(/부교재|마더텅|올림프/.test(x))return '부교재';if(/프린트|수업노트|필기|학교자료|지리 1차/.test(x))return '학교 프린트';return x||'기타';}
+function analysisMatches(a){return a?.subject===studySubject&&(studyType==='전체'||normalizeStudyType(a.materialType)===studyType);}
+function selectedAnalysis(){normalizeState();const hit=state.analyses.find(a=>analysisMatches(a)&&a.result);if(hit)return hit.result;if(studyType==='전체'){const latest=state.analyses?.[0];if(latest?.subject===studySubject&&state.ai)return state.ai;}return null;}
+function setStudySubject(subject){studySubject=subject;studyType='전체';renderStudySubject();renderTopics();renderAnalysisHistory();}
+function setStudyType(type){studyType=type;renderStudySubject();renderTopics();renderAnalysisHistory();}
 function renderStudySubject(){
   const tabs=document.getElementById('studySubjectTabs');if(!tabs)return;
   tabs.innerHTML=STUDY_SUBJECTS.map(s=>`<button class="${s===studySubject?'on':''}" onclick="setStudySubject('${s}')">${esc(s)}</button>`).join('');
+  studyTypeTabs.innerHTML=STUDY_TYPES.map(t=>`<button class="${t===studyType?'on':''}" onclick="setStudyType('${t}')">${esc(t)}</button>`).join('');
   studySubjectTitle.textContent=studySubject;studySubjectRange.textContent=subjectRange(studySubject)||'시험범위 미등록';
   const analyses=state.analyses.filter(a=>a.subject===studySubject);studySubjectAnalysisCount.textContent=`분석 ${analyses.length}건`;
-  const mats=state.materials.filter(m=>m.subject===studySubject);
-  studySubjectMaterials.innerHTML=mats.length?mats.map(m=>`<div class="item"><b>${esc(m.type||'자료')}</b><div class="small">${(m.files||[]).map(esc).join(', ')}</div>${m.memo?`<div class="small" style="margin-top:5px">${esc(m.memo)}</div>`:''}</div>`).join(''):'<div class="empty">이 과목에 등록된 자료가 없습니다.</div>';
+  const allMats=state.materials.filter(m=>m.subject===studySubject);
+  const mats=studyType==='전체'?allMats:allMats.filter(m=>normalizeStudyType(m.type)===studyType);
+  const confirmed=(CONFIRMED_SCHOOL_MATERIALS[studySubject]||[]).filter(x=>studyType==='전체'||normalizeStudyType(x.kind)===studyType);
+  studySourceGuide.innerHTML=`<b>${esc(studySubject)} · ${esc(studyType)}</b><br>${studyType==='전체'?'교과서·프린트·부교재·전국연합학력평가를 모두 모아 봅니다.':'선택한 자료 종류의 분석과 학습내용만 보여줍니다.'}`;
+  const registered=mats.map(m=>`<div class="item"><span class="source-badge">${esc(normalizeStudyType(m.type))}</span><b>${esc(m.type||'자료')}</b><div class="small">${(m.files||[]).map(esc).join(', ')}</div>${m.memo?`<div class="small" style="margin-top:5px">${esc(m.memo)}</div>`:''}</div>`);
+  const confirmedRows=confirmed.map(x=>`<div class="item"><span class="source-badge">확인자료</span><b>${esc(x.name)}</b><div class="small">${esc(x.summary)}</div></div>`);
+  const rows=[...registered,...confirmedRows];studySubjectMaterials.innerHTML=rows.length?rows.join(''):'<div class="empty">이 구분에 등록되거나 확인된 자료가 없습니다.</div>';
 }
 const MIDTERM_SCOPES={
  '공통국어2':'교과서: 1-(1) 제망매가, 가을무덤 / 1-(3) 남신의주 유동 박시봉 방, 택배 / 2-(1) #지구 #소통 / 2-(2) 슬기로운 엠비티아이(MBTI) 사용법 / 3-(1) 국어의 변화와 발전(세종어제훈민정음, 용비어천가) / 전국연합학력평가: 2026학년도 9월 고1 전국연합학력평가 국어영역 전범위 / 프린트물: 시험범위 포함, 실제 내용은 추후 확인',
@@ -245,7 +257,7 @@ function renderTopics(){
  mustCount.textContent=aiTopics.filter(t=>Number(t.importance)>=5).length;
  importantCount.textContent=aiTopics.filter(t=>Number(t.importance)===4).length;
  if(aiTopics.length){
-   topics.innerHTML=aiTopics.slice(0,15).map((t,i)=>{const imp=Math.max(1,Math.min(5,Number(t.importance)||4));return `<div class="item"><b>${i+1}. ${esc(t.title||'핵심 개념')}</b><span class="stars">${'★'.repeat(imp)}${'☆'.repeat(5-imp)}</span><div class="detail-grid" style="margin-top:9px">${t.definition?`<div class="detail-row"><strong>정의</strong>${esc(t.definition)}</div>`:''}${t.principle?`<div class="detail-row"><strong>원리·과정</strong>${esc(t.principle)}</div>`:''}${t.exam_point?`<div class="detail-row"><strong>시험 포인트</strong>${esc(t.exam_point)}</div>`:''}${t.common_trap?`<div class="warnbox"><strong>⚠ 자주 틀리는 부분</strong>${esc(t.common_trap)}</div>`:''}${t.source_basis?`<div class="small">자료 근거: ${esc(t.source_basis)}</div>`:''}</div></div>`}).join('');
+   topics.innerHTML=aiTopics.slice(0,15).map((t,i)=>{const imp=Math.max(1,Math.min(5,Number(t.importance)||4));return `<div class="item"><b class="${imp>=5?'important-red':''}">${i+1}. ${esc(t.title||'핵심 개념')}</b><span class="stars">${'★'.repeat(imp)}${'☆'.repeat(5-imp)}</span><div class="detail-grid" style="margin-top:9px">${t.definition?`<div class="detail-row"><strong>정의</strong>${esc(t.definition)}</div>`:''}${t.principle?`<div class="detail-row"><strong>원리·과정</strong>${esc(t.principle)}</div>`:''}${t.exam_point?`<div class="detail-row exam-redbox"><strong class="important-red">시험 포인트</strong>${esc(t.exam_point)}</div>`:''}${t.common_trap?`<div class="warnbox exam-redbox"><strong class="important-red">⚠ 자주 틀리는 부분</strong>${esc(t.common_trap)}</div>`:''}${t.source_basis?`<div class="small">자료 근거: ${esc(t.source_basis)}</div>`:''}</div></div>`}).join('');
  }else{
    let arr=[];state.materials.filter(m=>m.subject==='통합과학').forEach(m=>{if(m.memo)arr.push(...m.memo.split(/[,/·]/).map(s=>s.trim()).filter(Boolean))});
    topics.innerHTML=arr.length?[...new Set(arr)].slice(0,6).map((t,i)=>`<div class="item"><b>${i+1}. ${esc(t)}</b><span class="stars">★★★★</span><div><span class="tag">메모 기반</span></div></div>`).join(''):'<div class="empty">아직 AI 핵심정리가 없습니다. 자료를 업로드하고 AI 분석을 실행해주세요.</div>';
@@ -271,7 +283,7 @@ function retryWrong(){if(!state.wrong.length)return;startQuiz(state.wrong)}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 
 function renderDashboard(){normalizeState();dashMat.textContent=state.materials.length;dashAttempt.textContent=state.stats.attempts||0;dashAcc.textContent=state.stats.attempts?Math.round((state.stats.correct/state.stats.attempts)*100)+'%':'-';const rows=Object.entries(state.stats.bySubject||{});subjectStats.innerHTML=rows.length?rows.map(([s,v])=>{const pct=v.attempts?Math.round(v.correct/v.attempts*100):0;return `<div class="barrow"><b>${esc(s)}</b><div class="miniBar"><i style="width:${pct}%"></i></div><span class="small">${pct}%</span></div>`}).join(''):'<div class="small">문제를 풀면 과목별 정답률이 표시됩니다.</div>';}
-function renderAnalysisHistory(){normalizeState();const arr=state.analyses.filter(a=>a.subject===studySubject);analysisHistory.innerHTML=arr.length?arr.slice(0,8).map(a=>`<div class="item"><b>${esc(a.subject||'과목')} · ${esc(a.materialType||'자료')}</b><div class="small">${new Date(a.createdAt).toLocaleString('ko-KR')} · 파일 ${a.fileCount||0}개</div><div style="margin-top:6px">${esc(a.summary||'분석 완료')}</div></div>`).join(''):`<div class="empty">${esc(studySubject)}의 AI 분석 이력이 없습니다.</div>`;}
+function renderAnalysisHistory(){normalizeState();const arr=state.analyses.filter(a=>analysisMatches(a));analysisHistory.innerHTML=arr.length?arr.slice(0,8).map(a=>`<div class="item"><b>${esc(a.subject||'과목')} · ${esc(a.materialType||'자료')}</b><div class="small">${new Date(a.createdAt).toLocaleString('ko-KR')} · 파일 ${a.fileCount||0}개</div><div style="margin-top:6px">${esc(a.summary||'분석 완료')}</div></div>`).join(''):`<div class="empty">${esc(studySubject)}의 AI 분석 이력이 없습니다.</div>`;}
 function renderFinal(){
   const cards=[];
   state.wrong.slice(-5).reverse().forEach(w=>cards.push({t:'오답',b:w.q+' → '+w.o[w.a]}));

@@ -207,60 +207,31 @@ async function createStructuredResponse({ model, content, schemaName, schema, ma
       throw new Error(`AI 결과 형식을 읽지 못했습니다. (${e.message})`);
     }
   } catch (e) {
-    if (e?.name === "AbortError") throw new Error("AI 분석이 105초를 초과했습니다. 잠시 후 다시 시도해주세요.");
+    if (e?.name === "AbortError") throw new Error("AI 분석이 180초를 초과했습니다. 잠시 후 다시 시도해주세요.");
     throw e;
   } finally {
     clearTimeout(timer);
   }
 }
 
-const teachingSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["summary", "overview", "easy_lessons", "topics", "comparisons", "traps", "coverage_note"],
+const lessonSchema = {
+  type: "object", additionalProperties: false,
+  required: ["summary","overview","easy_lessons","coverage_note"],
   properties: {
-    summary: { type: "string" },
-    overview: { type: "array", items: { type: "string" } },
-    easy_lessons: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["title", "why", "easy_explanation", "steps", "example", "terms", "check", "answer"],
-        properties: {
-          title: { type: "string" }, why: { type: "string" }, easy_explanation: { type: "string" },
-          steps: { type: "array", items: { type: "string" } }, example: { type: "string" },
-          terms: { type: "array", items: { type: "object", additionalProperties: false, required: ["term", "meaning"], properties: { term: { type: "string" }, meaning: { type: "string" } } } },
-          check: { type: "string" }, answer: { type: "string" }
-        }
-      }
-    },
-    topics: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["title", "importance", "definition", "principle", "exam_point", "common_trap", "source_basis"],
-        properties: {
-          title: { type: "string" }, importance: { type: "integer" }, definition: { type: "string" }, principle: { type: "string" },
-          exam_point: { type: "string" }, common_trap: { type: "string" }, source_basis: { type: "string" }
-        }
-      }
-    },
-    comparisons: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["title", "items"],
-        properties: {
-          title: { type: "string" },
-          items: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "points"], properties: { name: { type: "string" }, points: { type: "array", items: { type: "string" } } } } }
-        }
-      }
-    },
-    traps: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "explanation"], properties: { title: { type: "string" }, explanation: { type: "string" } } } },
-    coverage_note: { type: "string" }
+    summary:{type:"string"},
+    overview:{type:"array",items:{type:"string"}},
+    easy_lessons:{type:"array",items:{type:"object",additionalProperties:false,required:["title","why","easy_explanation","steps","example","terms","check","answer"],properties:{
+      title:{type:"string"},why:{type:"string"},easy_explanation:{type:"string"},steps:{type:"array",items:{type:"string"}},example:{type:"string"},
+      terms:{type:"array",items:{type:"object",additionalProperties:false,required:["term","meaning"],properties:{term:{type:"string"},meaning:{type:"string"}}}},check:{type:"string"},answer:{type:"string"}
+    }}},
+    coverage_note:{type:"string"}
+  }
+};
+const conceptSchema = {
+  type:"object",additionalProperties:false,required:["topics","comparisons","traps"],properties:{
+    topics:{type:"array",items:{type:"object",additionalProperties:false,required:["title","importance","definition","principle","exam_point","common_trap","source_basis"],properties:{title:{type:"string"},importance:{type:"integer"},definition:{type:"string"},principle:{type:"string"},exam_point:{type:"string"},common_trap:{type:"string"},source_basis:{type:"string"}}}},
+    comparisons:{type:"array",items:{type:"object",additionalProperties:false,required:["title","items"],properties:{title:{type:"string"},items:{type:"array",items:{type:"object",additionalProperties:false,required:["name","points"],properties:{name:{type:"string"},points:{type:"array",items:{type:"string"}}}}}}}},
+    traps:{type:"array",items:{type:"object",additionalProperties:false,required:["title","explanation"],properties:{title:{type:"string"},explanation:{type:"string"}}}}
   }
 };
 
@@ -292,7 +263,7 @@ const CONFIRMED_REFERENCE_MATERIALS={
 };
 function confirmedReferenceText(subject){return (CONFIRMED_REFERENCE_MATERIALS[subject]||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");}
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.11" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"0.9.12" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
@@ -307,45 +278,43 @@ app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req
     const model = process.env.OPENAI_MODEL || "gpt-6-luna";
     const fileContent = uploaded.map(f => ({ type: "input_file", file_id: f.id }));
 
-    const teachingPrompt = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 꼼꼼한 1:1 과외 선생님입니다.
-과목: ${subject}\n자료 종류: ${materialType}\n시험 범위: ${examRange || "미입력"}\n확인된 교과서 정보: ${textbookInfo || "미등록"}\n확인된 학교자료 참고정보: ${confirmedReference || "미등록"}\n첨부자료 상태: ${files.length ? `첨부 ${files.length}개 있음` : "첨부 없음 - 시험범위와 교과 일반지식 기반으로 설명"}\n사용자 메모: ${memo || "없음"}
+    const sharedRules = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 꼼꼼한 1:1 과외 선생님입니다.
+과목: ${subject}
+자료 종류: ${materialType}
+시험 범위: ${examRange || "미입력"}
+확인된 교과서 정보: ${textbookInfo || "미등록"}
+확인된 학교자료 참고정보: ${confirmedReference || "미등록"}
+첨부자료 상태: ${files.length ? `첨부 ${files.length}개 있음` : "첨부 없음 - 시험범위와 교과 일반지식 기반으로 설명"}
+사용자 메모: ${memo || "없음"}
 
-최우선 목표는 학생이 첨부된 교과서/학교 프린트/필기/사진/PDF의 내용을 처음부터 끝까지 쉽게 이해하는 것입니다.
-시험범위에 부교재·프린트·수업노트가 포함되어 있어도 실제 파일이 첨부되지 않았다면 그 자료의 구체적 문장·문제·표·그림을 추정하거나 만들어내지 마세요. 범위에 포함된다는 사실만 표시하고, 첨부 후 정밀 분석이 가능하다고 안내하세요.
-시험범위에 전국연합학력평가가 포함된 경우 반드시 별도의 시험범위로 인식하세요. 다만 해당 시험지 원문이 첨부되지 않았다면 실제 지문이나 문항 내용을 본 것처럼 재현하거나 추정하지 마세요. 첨부된 시험지가 있으면 그 파일을 최우선 근거로 분석하세요.
-- 자료의 흐름 순서대로 설명하세요.
-- 어려운 용어는 바로 쉬운 말로 풀이하세요.
-- 정의만 말하지 말고 왜 그런지, 과정이 무엇인지, 결과가 무엇인지 설명하세요.
-- 표/그림/공식/사례/강조표시가 읽히면 설명에 반영하세요.
-- 자료가 첨부된 경우에는 자료에 없는 사실이나 선생님 의도는 추측하지 마세요.
-- 첨부자료가 없으면 시험범위, 확인된 교과서 정보, 위의 확인된 학교자료 참고정보, 2022 개정 교육과정의 일반 교과지식을 바탕으로 설명하세요. 확인된 학교자료 참고정보는 사용자가 제공한 원본에서 확인된 요약이므로 그 범위 안에서는 근거로 사용할 수 있습니다. 다만 원문 문장, 정확한 표 수치, 문제 문항을 실제 파일을 다시 본 것처럼 재현하지 마세요.
-- 첨부자료가 없을 때 coverage_note에는 반드시 “첨부자료 없음 · 교과 일반지식 기반”이라는 취지를 명확히 적으세요.
-- 과학은 현상→원인→과정→결과→예시, 수학은 개념→공식 이유→풀이 순서→예제→실수, 영어는 뜻→단어→문법→해석→시험포인트, 역사/사회는 원인→사건→결과→관계→비교 순서를 기본으로 하세요.
-- summary는 5~7문장, overview 5~7개, easy_lessons 4~7개, topics 5~8개, traps 3~5개로 핵심을 충분히 설명하되 출력이 지나치게 길어지지 않게 작성하세요.
-- easy_lessons의 easy_explanation은 학생이 원자료를 다시 보지 않아도 핵심 흐름을 이해할 정도로 구체적으로 작성하세요.`;
+공통 원칙:
+- 첨부자료가 있으면 첨부자료를 최우선 근거로 사용합니다.
+- 부교재·프린트·수업노트 원본이 없으면 구체적인 문장·문제·표·그림을 추정하지 않습니다.
+- 전국연합학력평가는 별도 범위로 인식하되 시험지 원문이 없으면 실제 지문/문항을 본 것처럼 만들지 않습니다.
+- 어려운 용어는 바로 쉬운 말로 풀이하고, 정의만 적지 말고 왜 그런지와 과정·결과·예시를 연결합니다.
+- 과학: 현상→원인→과정→결과→예시 / 수학: 개념→공식 이유→풀이 순서→대표예제→실수 / 영어: 뜻→단어→문법→자연스러운 해석→시험포인트 / 역사·사회: 배경·원인→전개→결과→의미→비교 순서를 기본으로 합니다.
+- 학생이 원자료를 다시 펼치지 않아도 흐름이 잡힐 정도로 충분히 설명하되, 근거 없는 내용은 추가하지 않습니다.`;
 
-    let teaching;
+    const lessonPrompt = sharedRules + `\n\n[1차: 이해 중심 심화 설명]\n짧은 요약문으로 끝내지 마세요. summary 7~10문장, overview 7~10개, easy_lessons 6~9개를 작성하세요. easy_lessons마다 쉬운 설명은 최소 4~7문장으로 하고, 반드시 왜 배우는지·과정/원리·대표 예시·용어 풀이·이해확인 질문을 포함하세요. 시험범위가 넓으면 큰 단원을 빠뜨리지 말고 고르게 다루세요. coverage_note에는 첨부 유무와 근거의 한계를 명확히 적으세요.`;
+    let lessons;
     try {
-      teaching = await createStructuredResponse({
-        model,
-        content: [{ type: "input_text", text: teachingPrompt }, ...fileContent],
-        schemaName: "examkok_teaching",
-        schema: teachingSchema,
-        maxOutputTokens: 7000
-      });
-    } catch (firstError) {
-      const msg=String(firstError?.message||"");
-      if (!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw firstError;
-      console.warn(`[analyze] teaching retry compact subject=${subject}: ${msg}`);
-      const compactPrompt = teachingPrompt + `\n\n[재시도 지침] 이전 응답이 출력 길이 한도를 넘었습니다. 반드시 더 압축해서 작성하세요. summary 4~5문장, overview 5개, easy_lessons 정확히 4개, topics 정확히 5개, comparisons 최대 2개, traps 3개로 제한하세요. 각 설명은 핵심만 2~4문장으로 작성하세요.`;
-      teaching = await createStructuredResponse({
-        model,
-        content: [{ type: "input_text", text: compactPrompt }, ...fileContent],
-        schemaName: "examkok_teaching_compact",
-        schema: teachingSchema,
-        maxOutputTokens: 6500
-      });
+      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:lessonPrompt},...fileContent],schemaName:"examkok_lessons",schema:lessonSchema,maxOutputTokens:7600});
+    } catch(e) {
+      const msg=String(e?.message||"");
+      if(!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw e;
+      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[1차 재시도]\nsummary 6문장, overview 6개, easy_lessons 정확히 5개. 각 쉬운 설명은 3~5문장으로 핵심을 빠짐없이 설명하세요.`},...fileContent],schemaName:"examkok_lessons_compact",schema:lessonSchema,maxOutputTokens:6500});
     }
+
+    const conceptPrompt = sharedRules + `\n\n[2차: 시험 핵심 심화 정리]\n시험 대비용으로 topics 8~12개, comparisons 2~4개, traps 4~7개를 작성하세요. 각 topic은 정의만 한 줄 쓰지 말고 원리/흐름을 3~6문장으로 설명하세요. exam_point는 실제 시험에서 무엇을 구분하고 어떤 식으로 묻기 쉬운지 구체적으로 쓰세요. 반드시 외워야 하거나 출제 가능성이 높은 내용은 importance 5로 표시하세요. common_trap에는 학생이 흔히 틀리는 구분을 구체적으로 적으세요.`;
+    let concepts;
+    try {
+      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:conceptPrompt},...fileContent],schemaName:"examkok_concepts",schema:conceptSchema,maxOutputTokens:7200});
+    } catch(e) {
+      const msg=String(e?.message||"");
+      if(!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw e;
+      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[2차 재시도]\ntopics 정확히 7개, comparisons 최대 2개, traps 4개. 각 항목은 짧지만 시험에 필요한 원리와 구분을 반드시 포함하세요.`},...fileContent],schemaName:"examkok_concepts_compact",schema:conceptSchema,maxOutputTokens:6000});
+    }
+    const teaching={...lessons,...concepts};
 
     const compactContext = JSON.stringify({
       subject,
