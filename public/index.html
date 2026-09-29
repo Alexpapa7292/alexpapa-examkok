@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Alexpapa 시험콕 V8</title>
+<meta name="theme-color" content="#3b82f6" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<style>
+:root{--bg:#f6f8fb;--card:#fff;--text:#172033;--muted:#718096;--line:#e8edf4;--primary:#3b82f6;--green:#10b981;--orange:#f59e0b;--red:#ef4444;--purple:#8b5cf6}
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--text)}
+.app{max-width:720px;margin:0 auto;min-height:100vh;padding:18px 16px 92px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.brand{font-size:21px;font-weight:800}.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(20,35,60,.04)}
+.hero{background:linear-gradient(135deg,#eff6ff,#fff)} h1,h2,h3,p{margin-top:0}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#eff6ff;color:#2563eb;font-size:12px;font-weight:700}.d{font-size:34px;font-weight:900;color:#2563eb;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.btn{border:0;border-radius:14px;padding:14px 12px;font-weight:800;cursor:pointer;background:#eef2f7;color:#25324a}.btn.primary{background:var(--primary);color:#fff}.btn.green{background:#ecfdf5;color:#047857}.btn.orange{background:#fff7ed;color:#c2410c}.btn.red{background:#fef2f2;color:#b91c1c}.btn:disabled{opacity:.5;cursor:not-allowed}
+label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,select,textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;font:inherit} textarea{min-height:88px;resize:vertical}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.section-title{font-size:18px;font-weight:900;margin-bottom:10px}.small{font-size:12px;color:var(--muted)}.list{display:grid;gap:9px}.item{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff}.item b{display:block;margin-bottom:4px}.stars{color:#f59e0b;letter-spacing:1px}.tag{font-size:11px;border-radius:999px;padding:4px 7px;background:#f3f4f6;color:#4b5563;margin-right:5px;display:inline-block;margin-top:5px}
+.nav{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.97);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:9}.navin{width:min(720px,100%);display:grid;grid-template-columns:repeat(5,1fr);padding:8px}.nav button{border:0;background:none;padding:8px 4px;font-size:12px;color:#64748b;cursor:pointer}.nav button.active{color:#2563eb;font-weight:900}.screen{display:none}.screen.active{display:block}.progress{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:#3b82f6}.qopt{width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;margin-top:8px;cursor:pointer}.qopt.correct{border-color:#10b981;background:#ecfdf5}.qopt.wrong{border-color:#ef4444;background:#fef2f2}.notice{padding:12px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);font-size:13px}.empty{text-align:center;color:var(--muted);padding:26px 10px}.filebox{border:1px dashed #9db5d4;border-radius:14px;padding:18px;text-align:center;background:#f8fbff}.metric{font-size:28px;font-weight:900}.dashgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.barrow{display:grid;grid-template-columns:64px 1fr 48px;gap:8px;align-items:center;margin-top:8px}.miniBar{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}.miniBar i{display:block;height:100%;background:#3b82f6}.history{display:grid;gap:8px}@media(max-width:520px){.dashgrid{grid-template-columns:1fr 1fr}.top{align-items:flex-start}.userbox{flex-wrap:wrap;justify-content:flex-end}}
+</style>
+
+<style>
+.auth-gate{position:fixed;inset:0;background:linear-gradient(180deg,#eef5ff,#f8fafc);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px}.auth-card{width:min(430px,100%);background:white;border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 20px 60px rgba(30,60,100,.12)}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:15px 0}.auth-tabs button{border:0;border-radius:10px;padding:10px;font-weight:800}.auth-tabs button.on{background:#2563eb;color:white}.userbox{display:flex;gap:8px;align-items:center;font-size:12px}.userbox button{border:0;background:#eef2f7;border-radius:9px;padding:7px 9px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="authGate" class="auth-gate">
+  <div class="auth-card">
+    <div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">내 시험자료와 오답을 어디서든 이어서 공부해요.</div>
+    <div class="auth-tabs"><button id="loginTab" class="on" onclick="authMode('login')">로그인</button><button id="joinTab" onclick="authMode('join')">회원가입</button></div>
+    <div id="nameWrap" style="display:none"><label>학생 이름</label><input id="authName" placeholder="예: Alex" /></div>
+    <label>이메일</label><input id="authEmail" type="email" placeholder="student@example.com" />
+    <label>비밀번호</label><input id="authPassword" type="password" placeholder="6자 이상" />
+    <button id="authSubmit" class="btn primary" style="width:100%;margin-top:14px" onclick="submitAuth()">로그인</button>
+    <div id="authMsg" class="small" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V8 클라우드 학습</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
+
+  <section id="home" class="screen active">
+    <div class="card hero"><div class="small" id="examLabel">2학기 중간고사</div><div class="d" id="dDay">시험일 미설정</div><div id="examMeta" class="small">시험을 등록하면 D-Day와 범위를 관리할 수 있어요.</div></div>
+    <div class="card"><div class="section-title">내 학습 대시보드</div><div class="dashgrid"><div class="item"><div class="metric" id="dashMat">0</div><b>등록 자료</b></div><div class="item"><div class="metric" id="dashAttempt">0</div><b>푼 문제</b></div><div class="item"><div class="metric" id="dashAcc">-</div><b>정답률</b></div></div><div id="subjectStats" style="margin-top:12px"></div></div>
+    <div class="card"><div class="section-title">오늘 20분 공부</div><div class="list"><div class="item"><b>01 통합과학 오답 5문제</b><span class="small">8분</span></div><div class="item"><b>02 영어 핵심단어 20개</b><span class="small">7분</span></div><div class="item"><b>03 한국사 암기 10개</b><span class="small">5분</span></div></div></div>
+    <div class="grid"><button class="btn primary" onclick="go('exam')">＋ 시험 등록</button><button class="btn green" onclick="go('materials')">⇧ 자료 올리기</button><button class="btn orange" onclick="go('study')">▤ 과목별 공부</button><button class="btn red" onclick="go('wrong')">↺ 오답노트</button></div>
+  </section>
+
+  <section id="exam" class="screen">
+    <div class="card"><div class="section-title">시험 등록</div>
+      <label>시험명</label><input id="examName" value="2학기 중간고사" />
+      <div class="row"><div><label>시험일</label><input id="examDate" type="date" /></div><div><label>학교/학년</label><input id="school" value="하남고등학교 1학년" /></div></div>
+      <label>통합과학 범위</label><input id="scienceRange" placeholder="예: 교과서 32~87p / 프린트 1~5" />
+      <label>한국사 범위</label><input id="historyRange" placeholder="예: 조선 후기 ~ 개항기" />
+      <label>영어 범위</label><input id="englishRange" placeholder="예: Lesson 3~4 / 학교 프린트" />
+      <label>수학 범위</label><input id="mathRange" placeholder="예: 1단원~3단원" />
+      <button class="btn primary" style="width:100%;margin-top:14px" onclick="saveExam()">저장하기</button>
+    </div>
+  </section>
+
+  <section id="materials" class="screen">
+    <div class="card"><div class="section-title">자료 올리기</div>
+      <div class="filebox"><input id="files" type="file" multiple accept="image/*,.pdf,.txt,.doc,.docx" /><div class="small" style="margin-top:8px">사진 · PDF · 문서 선택 가능</div></div>
+      <label>자료 종류</label><select id="materialType"><option>학교 프린트</option><option>교과서</option><option>수업 필기</option><option>이전 시험지</option><option>수행평가</option></select>
+      <label>과목</label><select id="materialSubject"><option>통합과학</option><option>한국사</option><option>영어</option><option>수학</option></select>
+      <label>자료 메모</label><textarea id="materialMemo" placeholder="예: 판 구조론, 지구 내부 구조, 선생님 강조 표시 포함"></textarea>
+      <button class="btn primary" style="width:100%" onclick="addMaterial()">시험콕 분석 시작</button>
+    </div>
+    <div class="card"><div class="section-title">등록 자료</div><div id="materialList" class="list"></div></div>
+  </section>
+
+  <section id="study" class="screen">
+    <div class="card"><div class="section-title">AI 핵심정리</div><div id="aiSummary" class="notice">자료를 올리면 AI가 첨부 자료에 근거해 핵심정리와 문제를 만듭니다.</div></div>
+    <div class="card"><div class="section-title">이 자료에서 꼭 공부할 것</div>
+      <div class="grid"><div class="item"><div class="metric" style="color:#ef4444">6</div><b>★★★★★ 반드시 암기</b></div><div class="item"><div class="metric" style="color:#f59e0b">9</div><b>★★★★ 중요 개념</b></div></div>
+      <div id="topics" class="list" style="margin-top:12px"></div>
+      <button class="btn primary" style="width:100%;margin-top:12px" onclick="startQuiz()">문제 풀기</button>
+    </div>
+    <div class="card"><div class="section-title">AI 분석 이력</div><div id="analysisHistory" class="history"></div></div>
+  </section>
+
+  <section id="quiz" class="screen">
+    <div class="card"><div class="section-title">문제풀이</div><div class="progress"><i id="bar" style="width:20%"></i></div><div id="quizBox" style="margin-top:14px"></div></div>
+  </section>
+
+  <section id="wrong" class="screen">
+    <div class="card"><div class="section-title">오답노트</div><div id="wrongList"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="retryWrong()">오답 다시 풀기</button></div>
+  </section>
+
+  <section id="final" class="screen">
+    <div class="card"><div class="section-title">시험직전 10초 암기</div><div class="notice">시험 직전에는 새로운 내용을 늘리기보다, 자주 틀린 것과 핵심 개념만 빠르게 확인하세요.</div></div>
+    <div class="card"><div class="section-title">오늘의 초압축 카드</div><div id="finalCards" class="list"></div></div>
+    <div class="card"><div class="section-title">내 학습 현황</div><div class="grid"><div class="item"><div class="metric" id="statMat">0</div><b>등록 자료</b></div><div class="item"><div class="metric" id="statWrong">0</div><b>오답</b></div></div></div>
+    <div class="card"><div class="section-title">백업 / 복원</div><button class="btn" style="width:100%;margin-bottom:8px" onclick="exportData()">학습기록 백업</button><label>백업 JSON 붙여넣기</label><textarea id="importBox" placeholder="백업 데이터를 붙여넣으세요"></textarea><button class="btn primary" style="width:100%" onclick="importData()">복원하기</button></div>
+  </section>
+</div>
+
+<div class="nav"><div class="navin"><button data-go="home" class="active" onclick="go('home')">⌂<br>홈</button><button data-go="materials" onclick="go('materials')">▣<br>자료</button><button data-go="study" onclick="go('study')">▤<br>공부</button><button data-go="wrong" onclick="go('wrong')">↺<br>오답</button><button data-go="final" onclick="go('final')">⚡<br>직전</button></div></div>
+<script>
+const SKEY='alexpapa_examkok_v8_cache';
+let state=JSON.parse(localStorage.getItem(SKEY)||'{"exam":{},"materials":[],"wrong":[],"ai":null,"analyses":[],"stats":{"attempts":0,"correct":0,"bySubject":{}}}');
+function normalizeState(){state.exam=state.exam||{};state.materials=state.materials||[];state.wrong=state.wrong||[];state.analyses=state.analyses||[];state.stats=state.stats||{attempts:0,correct:0,bySubject:{}};state.stats.bySubject=state.stats.bySubject||{};}
+normalizeState();
+let authKind='login'; let syncTimer=null;
+const baseQuiz=[
+ {q:'지구의 판이 서로 벌어지는 경계에서 주로 나타나는 현상은?',o:['해령 형성','습곡 산맥 형성','해구 형성','대륙 충돌'],a:0,e:'발산형 경계에서는 마그마가 상승하며 새로운 해양 지각이 만들어져 해령이 발달합니다.'},
+ {q:'지구 내부에서 가장 두꺼운 층은?',o:['지각','맨틀','외핵','내핵'],a:1,e:'맨틀은 지각 아래부터 약 2,900km 깊이까지 이어져 가장 두껍습니다.'},
+ {q:'지진의 규모와 진도에 대한 설명으로 옳은 것은?',o:['둘 다 관측 지점마다 다르다','규모는 지진 자체의 크기, 진도는 지점별 흔들림 정도다','진도는 항상 규모보다 크다','규모는 피해 정도만 나타낸다'],a:1,e:'규모는 지진 자체의 에너지 크기, 진도는 특정 장소에서 느낀 흔들림이나 피해 정도입니다.'},
+ {q:'수렴형 경계에서 나타날 가능성이 높은 것은?',o:['해령','열곡대','해구와 화산호','새 해양지각 생성만'],a:2,e:'한 판이 다른 판 아래로 섭입하면 해구와 화산호가 형성될 수 있습니다.'},
+ {q:'오답 복습의 가장 효과적인 방식은?',o:['정답만 외운다','틀린 이유를 설명하고 다시 풀어본다','문제를 보지 않는다','해설만 읽고 끝낸다'],a:1,e:'틀린 이유를 언어화하고 다시 인출하는 과정이 복습에 효과적입니다.'}
+];
+const subjectQuiz={
+ '통합과학':baseQuiz,
+ '한국사':[
+  {q:'조선 후기 실학의 특징으로 가장 적절한 것은?',o:['성리학 이론만 중시','현실 문제 해결과 개혁 방안 탐구','불교 교리 연구','왕권 약화만 주장'],a:1,e:'실학은 현실 문제를 해결하고 사회 개혁 방안을 모색하는 학문 경향이었습니다.'},
+  {q:'흥선대원군의 정책으로 옳은 것은?',o:['경복궁 중건','과거제 폐지','한일병합','대한제국 수립'],a:0,e:'흥선대원군은 왕권 강화를 위해 경복궁을 중건했습니다.'}
+ ],
+ '영어':[
+  {q:'영어 본문을 시험 직전에 복습할 때 가장 효과적인 방법은?',o:['처음부터 끝까지 눈으로만 읽기','핵심 문장과 빈칸을 떠올리며 말해보기','모르는 단어만 건너뛰기','해석만 외우기'],a:1,e:'시험 직전에는 인출 연습을 통해 핵심 표현과 문장 구조를 떠올리는 방식이 효과적입니다.'}
+ ],
+ '수학':[
+  {q:'수학 오답을 다시 볼 때 가장 먼저 확인할 것은?',o:['정답 번호','계산 실수인지 개념 오류인지 원인','문제 길이','풀이 글씨 크기'],a:1,e:'오답 원인을 계산 실수, 개념 오류, 조건 해석 오류 등으로 구분하면 재발 방지에 도움이 됩니다.'}
+ ]
+};
+let quiz=[],qi=0,answered=false,currentSubject='통합과학';
+function persist(){localStorage.setItem(SKEY,JSON.stringify(state));document.getElementById('saveState').textContent='저장 중';clearTimeout(syncTimer);syncTimer=setTimeout(async()=>{try{const r=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state})});document.getElementById('saveState').textContent=r.ok?'클라우드 저장':'로컬 저장';}catch{document.getElementById('saveState').textContent='로컬 저장'}setTimeout(()=>document.getElementById('saveState').textContent='자동저장',900)},250)}
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.go===id));window.scrollTo(0,0);if(id==='wrong')renderWrong();if(id==='study'){renderTopics();renderAnalysisHistory()}if(id==='final')renderFinal();if(id==='home')renderDashboard()}
+function saveExam(){state.exam={name:examName.value,date:examDate.value,school:school.value,science:scienceRange.value,history:historyRange.value,english:englishRange.value,math:mathRange.value};persist();renderExam();go('home')}
+function renderExam(){const e=state.exam||{}; if(e.name)examLabel.textContent=e.name; if(e.date){const t=new Date(e.date+'T00:00:00'),now=new Date();now.setHours(0,0,0,0);const d=Math.ceil((t-now)/86400000);dDay.textContent=d>=0?'D-'+d:'D+'+Math.abs(d);examMeta.textContent=`${e.date} · ${e.school||''}`;} else {dDay.textContent='시험일 미설정';examMeta.textContent='시험을 등록하면 D-Day와 범위를 관리할 수 있어요.'}
+ ['examName','examDate','school','scienceRange','historyRange','englishRange','mathRange'].forEach((id,i)=>{const keys=['name','date','school','science','history','english','math'];const el=document.getElementById(id);if(el&&e[keys[i]])el.value=e[keys[i]]})}
+async function addMaterial(){
+ const selected=[...files.files];
+ const fs=selected.map(f=>f.name);
+ const item={id:Date.now(),type:materialType.value,subject:materialSubject.value,memo:materialMemo.value,files:fs.length?fs:['메모 기반 자료']};
+ state.materials.unshift(item);persist();renderMaterials();
+ const btn=event?.target; const oldText=btn?.textContent; if(btn){btn.disabled=true;btn.textContent='AI 분석 중...'}
+ try{
+   const fd=new FormData(); selected.forEach(f=>fd.append('files',f));
+   fd.append('subject',item.subject);fd.append('materialType',item.type);fd.append('memo',item.memo||'');
+   const ranges=state.exam||{};const rm={'통합과학':'science','한국사':'history','영어':'english','수학':'math'};fd.append('examRange',ranges[rm[item.subject]]||'');
+   const r=await fetch('/api/analyze',{method:'POST',body:fd});
+   if(r.ok){const data=await r.json();state.ai=data.result;item.originals=data.originals||[];if(data.analysis)state.analyses.unshift(data.analysis);persist();renderAnalysisHistory();}
+   else{const er=await r.json().catch(()=>({}));console.warn(er.error||'AI 서버 미연결');}
+ }catch(e){console.warn('로컬 데모 모드:',e.message)}
+ finally{if(btn){btn.disabled=false;btn.textContent=oldText||'시험콕 분석 시작'}files.value='';materialMemo.value='';renderTopics();go('study')}
+}
+function renderMaterials(){materialList.innerHTML=state.materials.length?state.materials.map(m=>`<div class="item"><b>${m.subject} · ${m.type}</b><div class="small">${m.files.join(', ')}</div>${m.originals?.length?`<span class="tag">원본 ${m.originals.length}개 보관</span>`:''}${m.memo?`<div style="margin-top:6px">${esc(m.memo)}</div>`:''}</div>`).join(''):'<div class="empty">아직 등록된 자료가 없습니다.</div>'}
+function renderTopics(){let arr=[];state.materials.filter(m=>m.subject==='통합과학').forEach(m=>{if(m.memo)arr.push(...m.memo.split(/[,.\n/]/).map(x=>x.trim()).filter(Boolean))}); if(!arr.length)arr=['판 구조론','지구 내부 구조','지진과 화산']; topics.innerHTML=[...new Set(arr)].slice(0,6).map((t,i)=>`<div class="item"><b>${i+1}. ${esc(t)}</b><span class="stars">${i===0?'★★★★★':'★★★★'}</span><div><span class="tag">핵심정리</span><span class="tag">문제연결</span><span class="tag">오답복습</span></div></div>`).join('')}
+function startQuiz(custom){currentSubject=(state.analyses?.[0]?.subject)||(state.materials[0]?.subject)||'통합과학';if(custom){quiz=custom}else if(state.ai?.quiz?.length){quiz=state.ai.quiz.map(x=>({q:x.q,o:x.options,a:Number(x.answer)||0,e:x.explanation||'',subject:currentSubject}))}else{quiz=(subjectQuiz[currentSubject]||baseQuiz).map(x=>({...x,subject:currentSubject}))}qi=0;answered=false;go('quiz');renderQuiz()}
+function renderQuiz(){if(!quiz.length){quizBox.innerHTML='<div class="empty">문제가 없습니다.</div>';return}const q=quiz[qi];bar.style.width=((qi+1)/quiz.length*100)+'%';quizBox.innerHTML=`<div class="small">문제 ${qi+1}/${quiz.length}</div><h3 style="margin-top:8px">${q.q}</h3>${q.o.map((x,i)=>`<button class="qopt" onclick="answer(${i})">${i+1}. ${x}</button>`).join('')}<div id="feedback" style="margin-top:12px"></div>`}
+function answer(i){if(answered)return;answered=true;const q=quiz[qi];const opts=[...document.querySelectorAll('.qopt')];opts[q.a].classList.add('correct');normalizeState();const sub=q.subject||currentSubject||'기타';const ss=state.stats.bySubject[sub]||(state.stats.bySubject[sub]={attempts:0,correct:0});state.stats.attempts++;ss.attempts++;if(i===q.a){state.stats.correct++;ss.correct++;}else{if(!state.wrong.some(w=>w.q===q.q))state.wrong.push({...q,subject:sub});}persist();feedback.innerHTML=`<div class="notice"><b>${i===q.a?'정답입니다!':'오답입니다.'}</b><br>${q.e}</div><button class="btn primary" style="width:100%;margin-top:10px" onclick="nextQ()">${qi===quiz.length-1?'결과 보기':'다음 문제'}</button>`}
+function nextQ(){if(qi<quiz.length-1){qi++;answered=false;renderQuiz()}else{quizBox.innerHTML=`<div class="empty"><div class="metric">완료 ✓</div><p>문제풀이가 끝났습니다.</p><button class="btn primary" onclick="go('wrong')">오답노트 확인</button></div>`}}
+function renderWrong(){wrongList.innerHTML=state.wrong.length?state.wrong.map((w,i)=>`<div class="item"><b>${i+1}. ${w.q}</b><div class="small">정답: ${w.o[w.a]}</div><div style="margin-top:6px">${w.e}</div></div>`).join(''):'<div class="empty">아직 저장된 오답이 없습니다.<br>문제를 틀리면 자동으로 여기에 모입니다.</div>'}
+function retryWrong(){if(!state.wrong.length)return;startQuiz(state.wrong)}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+function renderDashboard(){normalizeState();dashMat.textContent=state.materials.length;dashAttempt.textContent=state.stats.attempts||0;dashAcc.textContent=state.stats.attempts?Math.round((state.stats.correct/state.stats.attempts)*100)+'%':'-';const rows=Object.entries(state.stats.bySubject||{});subjectStats.innerHTML=rows.length?rows.map(([s,v])=>{const pct=v.attempts?Math.round(v.correct/v.attempts*100):0;return `<div class="barrow"><b>${esc(s)}</b><div class="miniBar"><i style="width:${pct}%"></i></div><span class="small">${pct}%</span></div>`}).join(''):'<div class="small">문제를 풀면 과목별 정답률이 표시됩니다.</div>';}
+function renderAnalysisHistory(){normalizeState();analysisHistory.innerHTML=state.analyses.length?state.analyses.slice(0,8).map(a=>`<div class="item"><b>${esc(a.subject||'과목')} · ${esc(a.materialType||'자료')}</b><div class="small">${new Date(a.createdAt).toLocaleString('ko-KR')} · 파일 ${a.fileCount||0}개</div><div style="margin-top:6px">${esc(a.summary||'분석 완료')}</div></div>`).join(''):'<div class="empty">아직 AI 분석 이력이 없습니다.</div>';}
+function renderFinal(){
+  const cards=[];
+  state.wrong.slice(-5).reverse().forEach(w=>cards.push({t:'오답',b:w.q+' → '+w.o[w.a]}));
+  const ranges=state.exam||{};
+  [['통합과학',ranges.science],['한국사',ranges.history],['영어',ranges.english],['수학',ranges.math]].forEach(([s,r])=>{if(r)cards.push({t:s,b:r})});
+  if(state.ai?.flashcards?.length){state.ai.flashcards.slice(0,8).forEach(x=>cards.push({t:x.front||'10초 암기',b:x.back||''}));} if(!cards.length){cards.push({t:'통합과학',b:'판 구조론 · 지구 내부 구조 · 지진과 화산'});cards.push({t:'공부법',b:'정답을 보기 전에 먼저 떠올리고, 틀린 이유를 한 문장으로 설명하기'});}
+  finalCards.innerHTML=cards.slice(0,8).map(c=>`<div class="item"><span class="tag">${esc(c.t)}</span><b style="margin-top:7px">${esc(c.b)}</b></div>`).join('');
+  statMat.textContent=state.materials.length;statWrong.textContent=state.wrong.length;
+}
+function exportData(){const data=JSON.stringify(state,null,2);navigator.clipboard?.writeText(data);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='alexpapa_examkok_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function importData(){try{const d=JSON.parse(importBox.value);state.exam=d.exam||{};state.materials=d.materials||[];state.wrong=d.wrong||[];persist();renderExam();renderMaterials();renderTopics();renderAnalysisHistory();renderWrong();renderFinal();renderDashboard();alert('복원이 완료되었습니다.')}catch(e){alert('백업 데이터 형식을 확인해주세요.')}}
+renderExam();renderMaterials();renderTopics();renderAnalysisHistory();renderWrong();renderFinal();renderDashboard();
+
+function authMode(kind){authKind=kind;loginTab.classList.toggle('on',kind==='login');joinTab.classList.toggle('on',kind==='join');nameWrap.style.display=kind==='join'?'block':'none';authSubmit.textContent=kind==='login'?'로그인':'회원가입';authMsg.textContent=''}
+async function submitAuth(){authMsg.textContent='처리 중...';const payload={email:authEmail.value,password:authPassword.value,name:authName.value};try{const r=await fetch('/api/auth/'+(authKind==='login'?'login':'register'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'로그인 실패');await afterLogin(d.user)}catch(e){authMsg.textContent=e.message}}
+async function afterLogin(user){who.textContent=(user?.name||'학생')+'님';authGate.style.display='none';try{const r=await fetch('/api/state');if(r.ok){const d=await r.json();state=d.state||state;normalizeState();localStorage.setItem(SKEY,JSON.stringify(state));}}catch{}renderExam();renderMaterials();renderTopics();renderWrong();renderFinal()}
+async function logout(){try{await fetch('/api/auth/logout',{method:'POST'})}catch{}authGate.style.display='flex';who.textContent='';authPassword.value='';authMsg.textContent='로그아웃되었습니다.'}
+async function bootAuth(){try{const r=await fetch('/api/auth/me');if(r.ok){const d=await r.json();await afterLogin(d.user)}}catch{}}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
+bootAuth();
+
+</script>
+</body>
+</html>

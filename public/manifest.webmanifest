@@ -1,0 +1,18 @@
+{
+  "name": "Alexpapa 시험콕",
+  "short_name": "시험콕",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#3b82f6",
+  "lang": "ko-KR",
+  "description": "고1 시험자료 AI 분석, 문제풀이, 오답복습 앱",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
