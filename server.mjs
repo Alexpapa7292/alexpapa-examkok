@@ -244,7 +244,7 @@ app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.4: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V9.5.1: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }

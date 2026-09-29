@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Alexpapa 시험콕 V9.4</title>
+<title>Alexpapa 시험콕 V9.5.1</title>
 <meta name="theme-color" content="#3b82f6" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <link rel="manifest" href="/manifest.webmanifest" />
@@ -37,7 +37,7 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 </div>
 
 <div class="app">
-  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.4 심화 핵심정리</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
+  <div class="top"><div><div class="brand">🎓 Alexpapa 시험콕</div><div class="sub">하남고 고1 맞춤 시험 대비 · V9.5.1 쉽게 이해하는 교과서·자료 학습</div></div><div class="userbox"><span id="who"></span><button onclick="logout()">로그아웃</button><span class="pill" id="saveState">자동저장</span></div></div>
 
   <section id="home" class="screen active">
     <div class="card hero"><div class="small" id="examLabel">2학기 중간고사</div><div class="d" id="dDay">시험일 미설정</div><div id="examMeta" class="small">시험을 등록하면 D-Day와 범위를 관리할 수 있어요.</div></div>
@@ -141,7 +141,13 @@ async function addMaterial(){
    const fd=new FormData(); selected.forEach(f=>fd.append('files',f));
    fd.append('subject',item.subject);fd.append('materialType',item.type);fd.append('memo',item.memo||'');
    const ranges=state.exam||{};const rm={'통합과학':'science','한국사':'history','영어':'english','수학':'math'};fd.append('examRange',ranges[rm[item.subject]]||'');
-   const r=await fetch('/api/analyze',{method:'POST',body:fd});
+   const controller=new AbortController();
+   let elapsed=0;
+   const timer=setInterval(()=>{elapsed+=1;if(btn)btn.textContent=`AI 분석 중... ${elapsed}초`;},1000);
+   const timeout=setTimeout(()=>controller.abort(),120000);
+   let r;
+   try{r=await fetch('/api/analyze',{method:'POST',body:fd,signal:controller.signal});}
+   finally{clearInterval(timer);clearTimeout(timeout);}
    const data=await r.json().catch(()=>({}));
    if(!r.ok){throw new Error(data.error||`AI 분석 실패 (HTTP ${r.status})`);}
    state.ai=data.result;item.originals=data.originals||[];if(data.analysis)state.analyses.unshift(data.analysis);await persist();renderAnalysisHistory();renderTopics();
@@ -149,7 +155,7 @@ async function addMaterial(){
    go('study');
  }catch(e){
    console.error('AI 분석 오류:',e);
-   alert('AI 분석에 실패했습니다.\n\n'+(e?.message||'알 수 없는 오류')+'\n\nRender의 Logs에서 상세 원인을 확인할 수 있습니다.');
+   alert('AI 분석에 실패했습니다.\n\n'+(e?.name==='AbortError'?'분석 시간이 120초를 초과했습니다. 자료를 나누어 올리거나 다시 시도해주세요.':(e?.message||'알 수 없는 오류'))+'\n\nRender의 Logs에서 상세 원인을 확인할 수 있습니다.');
  }
  finally{if(btn){btn.disabled=false;btn.textContent=oldText||'시험콕 분석 시작'}files.value='';materialMemo.value='';renderMaterials();}
 }
