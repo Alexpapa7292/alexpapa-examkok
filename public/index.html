@@ -72,8 +72,8 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
   <section id="materials" class="screen">
     <div class="card"><div class="section-title">자료 올리기</div>
       <div class="filebox"><input id="files" type="file" multiple accept="image/*,.pdf,.txt,.doc,.docx" /><div class="small" style="margin-top:8px">사진 · PDF · 문서 선택 가능</div></div>
-      <label>자료 종류</label><select id="materialType"><option>학교 프린트</option><option>교과서</option><option>수업 필기</option><option>이전 시험지</option><option>수행평가</option></select>
-      <label>과목</label><select id="materialSubject"><option>공통국어2</option><option>공통수학2</option><option>공통영어2</option><option>한국사2</option><option>통합사회2</option><option>통합과학2</option></select><div id="selectedRange" class="notice" style="margin-top:10px"></div><div id="selectedTextbook" class="notice" style="margin-top:8px;display:none"></div><div id="selectedSchoolMaterials" class="notice" style="margin-top:8px;display:none"></div>
+      <label>자료 종류</label><select id="materialType"><option>학교 프린트</option><option>교과서</option><option>부교재</option><option>수업 필기</option><option>전국연합학력평가</option><option>이전 시험지</option><option>수행평가</option></select>
+      <div style="display:flex;align-items:end;gap:8px"><div style="flex:1"><label>과목</label><select id="materialSubject"></select></div><button class="btn" style="white-space:nowrap;margin-bottom:1px" onclick="addCustomSubject()">＋ 과목 추가</button></div><div id="selectedRange" class="notice" style="margin-top:10px"></div><div id="selectedTextbook" class="notice" style="margin-top:8px;display:none"></div><div id="selectedSchoolMaterials" class="notice" style="margin-top:8px;display:none"></div>
       <label>자료 메모</label><textarea id="materialMemo" placeholder="예: 판 구조론, 지구 내부 구조, 선생님 강조 표시 포함"></textarea>
       <button class="btn primary" style="width:100%" onclick="addMaterial()">시험콕 분석 시작</button>
     </div>
@@ -82,7 +82,7 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 
   <section id="study" class="screen">
     <div class="study-hero card">
-      <div class="eyebrow">V10 · AI 과외노트</div>
+      <div class="eyebrow">V10.1 · AI 과외노트</div>
       <div class="study-hero-row"><div><div class="study-main-title" id="studySubjectTitle">공통국어2</div><div class="small">과목 → 자료 → 단원 → 이해 → 암기 → 문제 순서로 공부합니다.</div></div><span class="pill" id="studySubjectAnalysisCount">분석 0건</span></div>
       <div id="studySubjectTabs" class="study-subject-tabs"></div>
     </div>
@@ -171,9 +171,12 @@ label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px} input,sele
 <script>
 const SKEY='alexpapa_examkok_v10_cache';
 let state=JSON.parse(localStorage.getItem(SKEY)||'{"exam":{},"materials":[],"wrong":[],"ai":null,"analyses":[],"stats":{"attempts":0,"correct":0,"bySubject":{}}}');
-function normalizeState(){state.exam=state.exam||{};state.materials=state.materials||[];state.wrong=state.wrong||[];state.analyses=state.analyses||[];state.stats=state.stats||{attempts:0,correct:0,bySubject:{}};state.stats.bySubject=state.stats.bySubject||{};}
+function normalizeState(){state.exam=state.exam||{};state.materials=state.materials||[];state.wrong=state.wrong||[];state.analyses=state.analyses||[];state.stats=state.stats||{attempts:0,correct:0,bySubject:{}};state.stats.bySubject=state.stats.bySubject||{};state.customSubjects=state.customSubjects||[];state.customRanges=state.customRanges||{};}
 normalizeState();
-const STUDY_SUBJECTS=['공통국어2','공통수학2','공통영어2','한국사2','통합사회2','통합과학2'];
+const DEFAULT_SUBJECTS=['공통국어2','공통수학2','공통영어2','한국사2','통합사회2','통합과학2'];
+function allSubjects(){normalizeState();return [...new Set([...DEFAULT_SUBJECTS,...state.customSubjects,...state.materials.map(m=>m.subject).filter(Boolean)])];}
+function renderSubjectOptions(){const el=document.getElementById('materialSubject');if(!el)return;const current=el.value||studySubject||'공통국어2';el.innerHTML=allSubjects().map(x=>`<option>${esc(x)}</option>`).join('');if(allSubjects().includes(current))el.value=current;updateSelectedRange();}
+function addCustomSubject(){const name=(prompt('추가할 과목명을 입력해주세요.\n예: 정보, 일본어, 음악')||'').trim();if(!name)return;normalizeState();if(!state.customSubjects.includes(name))state.customSubjects.push(name);const range=(prompt(`${name} 시험범위를 입력해주세요.\n아직 모르면 비워도 됩니다.`)||'').trim();if(range)state.customRanges[name]=range;studySubject=name;persist();renderSubjectOptions();renderStudySubject();renderTopics();renderAnalysisHistory();}
 let studySubject=(state.analyses?.[0]?.subject)||'공통국어2';
 const STUDY_TYPES=['전체','교과서','학교 프린트','부교재','전국연합학력평가'];
 let studyType='전체';
@@ -185,7 +188,7 @@ function setStudyType(type){studyType=type;renderStudySubject();renderTopics();r
 function jumpStudy(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});}
 function renderStudySubject(){
   const tabs=document.getElementById('studySubjectTabs');if(!tabs)return;
-  tabs.innerHTML=STUDY_SUBJECTS.map(s=>`<button class="${s===studySubject?'on':''}" onclick="setStudySubject('${s}')">${esc(s)}</button>`).join('');
+  tabs.innerHTML=allSubjects().map(s=>`<button class="${s===studySubject?'on':''}" onclick="setStudySubject('${s.replace(/'/g,"\\'")}')">${esc(s)}</button>`).join('');
   studyTypeTabs.innerHTML=STUDY_TYPES.map(t=>`<button class="${t===studyType?'on':''}" onclick="setStudyType('${t}')">${esc(t)}</button>`).join('');
   studySubjectTitle.textContent=studySubject;studySubjectRange.textContent=subjectRange(studySubject)||'시험범위 미등록';
   const analyses=state.analyses.filter(a=>a.subject===studySubject);studySubjectAnalysisCount.textContent=`분석 ${analyses.length}건`;
@@ -276,10 +279,11 @@ function persist(){localStorage.setItem(SKEY,JSON.stringify(state));document.get
 function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.go===id));window.scrollTo(0,0);if(id==='wrong')renderWrong();if(id==='study'){renderStudySubject();renderTopics();renderAnalysisHistory()}if(id==='final')renderFinal();if(id==='home')renderDashboard()}
 function saveExam(){state.exam={name:examName.value||'2학기 중간고사',date:examDate.value,school:school.value||'하남고등학교 1학년',korean:koreanRange.value,math:mathRange.value,english:englishRange.value,history:historyRange.value,social:socialRange.value,science:scienceRange.value,scopeVersion:SCOPE_VERSION};persist();renderExam();go('home')}
 function renderExam(){applyDefaultScopes();const e=state.exam||{};if(e.name)examLabel.textContent=e.name;if(e.date){const t=new Date(e.date+'T00:00:00'),now=new Date();now.setHours(0,0,0,0);const d=Math.ceil((t-now)/86400000);dDay.textContent=d>=0?'D-'+d:'D+'+Math.abs(d);examMeta.textContent=`${e.date} · ${e.school||''}`;}else{dDay.textContent='시험일 미설정';examMeta.textContent='2026년 2학기 중간고사 과목별 범위가 적용되어 있습니다.'}const fields={examName:e.name||'2학기 중간고사',examDate:e.date||'',school:e.school||'하남고등학교 1학년',koreanRange:e.korean,mathRange:e.math,englishRange:e.english,historyRange:e.history,socialRange:e.social,scienceRange:e.science};Object.entries(fields).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.value=v||''});updateSelectedRange();}
-function subjectRange(subject){const m={'공통국어2':'korean','공통수학2':'math','공통영어2':'english','한국사2':'history','통합사회2':'social','통합과학2':'science','통합과학':'science','한국사':'history','영어':'english','수학':'math'};return (state.exam||{})[m[subject]]||MIDTERM_SCOPES[subject]||''}
+function subjectRange(subject){normalizeState();const m={'공통국어2':'korean','공통수학2':'math','공통영어2':'english','한국사2':'history','통합사회2':'social','통합과학2':'science','통합과학':'science','한국사':'history','영어':'english','수학':'math'};return state.customRanges?.[subject]||(state.exam||{})[m[subject]]||MIDTERM_SCOPES[subject]||''}
 function updateSelectedRange(){const el=document.getElementById('selectedRange');const tb=document.getElementById('selectedTextbook');const sm=document.getElementById('selectedSchoolMaterials');if(el&&document.getElementById('materialSubject')){const sub=materialSubject.value;el.innerHTML='<b>이번 시험범위</b><br>'+esc(subjectRange(sub)||'범위 미등록');const ti=textbookInfo(sub);if(tb){tb.style.display=ti?'block':'none';tb.innerHTML=ti?'<b>확인된 교과서 정보</b><br>'+esc(ti):'';}const si=confirmedMaterialsInfo(sub);if(sm){sm.style.display=si?'block':'none';sm.innerHTML=si?'<b>확인된 학교자료</b><br>'+esc(si).replace(/\n/g,'<br>'):'';}}}
 async function addMaterial(){
  const selected=[...files.files];
+ const tooBig=selected.find(f=>f.size>25*1024*1024);if(tooBig){alert(`파일이 너무 큽니다.\n${tooBig.name}\n\n현재 1개 파일 최대 25MB입니다. PDF를 나누어 올려주세요.`);return;}
  const fs=selected.map(f=>f.name);
  const item={id:Date.now(),type:materialType.value,subject:materialSubject.value,memo:materialMemo.value,files:fs.length?fs:['첨부 없음 · 시험범위/교과지식 기반']};
  state.materials.unshift(item);persist();renderMaterials();
@@ -290,19 +294,19 @@ async function addMaterial(){
    fd.append('examRange',subjectRange(item.subject));fd.append('textbookInfo',textbookInfo(item.subject));
    const controller=new AbortController();
    let elapsed=0;
-   const timer=setInterval(()=>{elapsed+=1;if(btn)btn.textContent=`AI 분석 중... ${elapsed}초`;},1000);
+   const timer=setInterval(()=>{elapsed+=1;if(btn){const stage=elapsed<12?'파일 읽는 중':elapsed<35?'범위·핵심 추출 중':elapsed<80?'과외노트 만드는 중':'문제·암기카드 만드는 중';btn.textContent=`${stage}... ${elapsed}초`; }},1000);
    const timeout=setTimeout(()=>controller.abort(),240000);
    let r;
    try{r=await fetch('/api/analyze',{method:'POST',body:fd,signal:controller.signal});}
    finally{clearInterval(timer);clearTimeout(timeout);}
    const data=await r.json().catch(()=>({}));
-   if(!r.ok){throw new Error(data.error||`AI 분석 실패 (HTTP ${r.status})`);}
+   if(!r.ok){if(r.status===429){const sec=Number(data.retryAfterSeconds||0);let wait='잠시 후';if(sec>=3600)wait=`약 ${Math.ceil(sec/3600)}시간 후`;else if(sec>=60)wait=`약 ${Math.ceil(sec/60)}분 후`;else if(sec>0)wait=`약 ${sec}초 후`;throw new Error(`__RATE_LIMIT__|${wait}|${data.error||'OpenAI 사용량 한도에 도달했습니다.'}`);}throw new Error(data.error||`AI 분석 실패 (HTTP ${r.status})`);}
    state.ai=data.result;item.originals=data.originals||[];if(data.analysis)state.analyses.unshift({...data.analysis,result:data.result});studySubject=item.subject;await persist();renderStudySubject();renderAnalysisHistory();renderTopics();
    alert('AI 분석이 완료되었습니다.');
    go('study');
  }catch(e){
    console.error('AI 분석 오류:',e);
-   alert('AI 분석에 실패했습니다.\n\n'+(e?.name==='AbortError'?'분석 시간이 240초를 초과했습니다. 자료를 나누어 올리거나 다시 시도해주세요.':(e?.message||'알 수 없는 오류'))+'\n\nRender의 Logs에서 상세 원인을 확인할 수 있습니다.');
+   const msg=String(e?.message||'알 수 없는 오류');if(msg.startsWith('__RATE_LIMIT__|')){const [,wait,detail]=msg.split('|');alert(`AI 사용량 한도에 도달했습니다.\n\n앱 고장이 아니며 ${wait} 다시 시도해주세요.\n이미 등록한 자료 목록은 유지됩니다.\n\n${detail}`);}else{alert('AI 분석에 실패했습니다.\n\n'+(e?.name==='AbortError'?'분석 시간이 240초를 초과했습니다. 자료를 나누어 올리거나 다시 시도해주세요.':msg)+'\n\nRender의 Logs에서 상세 원인을 확인할 수 있습니다.');}
  }
  finally{if(btn){btn.disabled=false;btn.textContent=oldText||'시험콕 분석 시작'}files.value='';materialMemo.value='';renderMaterials();}
 }
@@ -352,18 +356,18 @@ function renderFinal(){
   const cards=[];
   state.wrong.slice(-5).reverse().forEach(w=>cards.push({t:'오답',b:w.q+' → '+w.o[w.a]}));
   const ranges=state.exam||{};
-  [['공통국어2',ranges.korean],['공통수학2',ranges.math],['공통영어2',ranges.english],['한국사2',ranges.history],['통합사회2',ranges.social],['통합과학2',ranges.science]].forEach(([s,r])=>{if(r)cards.push({t:s,b:r})});
+  [['공통국어2',ranges.korean],['공통수학2',ranges.math],['공통영어2',ranges.english],['한국사2',ranges.history],['통합사회2',ranges.social],['통합과학2',ranges.science],...state.customSubjects.map(s=>[s,state.customRanges?.[s]||''])].forEach(([s,r])=>{if(r)cards.push({t:s,b:r})});
   if(state.ai?.flashcards?.length){state.ai.flashcards.slice(0,8).forEach(x=>cards.push({t:x.front||'10초 암기',b:x.back||''}));} if(!cards.length){cards.push({t:'통합과학',b:'판 구조론 · 지구 내부 구조 · 지진과 화산'});cards.push({t:'공부법',b:'정답을 보기 전에 먼저 떠올리고, 틀린 이유를 한 문장으로 설명하기'});}
   finalCards.innerHTML=cards.slice(0,8).map(c=>`<div class="item"><span class="tag">${esc(c.t)}</span><b style="margin-top:7px">${esc(c.b)}</b></div>`).join('');
   statMat.textContent=state.materials.length;statWrong.textContent=state.wrong.length;
 }
 function exportData(){const data=JSON.stringify(state,null,2);navigator.clipboard?.writeText(data);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='alexpapa_examkok_backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function importData(){try{const d=JSON.parse(importBox.value);state.exam=d.exam||{};state.materials=d.materials||[];state.wrong=d.wrong||[];persist();renderExam();renderMaterials();renderStudySubject();renderTopics();renderAnalysisHistory();renderWrong();renderFinal();renderDashboard();alert('복원이 완료되었습니다.')}catch(e){alert('백업 데이터 형식을 확인해주세요.')}}
-renderExam();renderMaterials();renderTopics();renderAnalysisHistory();renderWrong();renderFinal();renderDashboard();
+renderExam();renderSubjectOptions();renderMaterials();renderStudySubject();renderTopics();renderAnalysisHistory();renderWrong();renderFinal();renderDashboard();
 
 function authMode(kind){authKind=kind;loginTab.classList.toggle('on',kind==='login');joinTab.classList.toggle('on',kind==='join');nameWrap.style.display=kind==='join'?'block':'none';authSubmit.textContent=kind==='login'?'로그인':'회원가입';authMsg.textContent=''}
 async function submitAuth(){authMsg.textContent='처리 중...';const payload={email:authEmail.value,password:authPassword.value,name:authName.value};try{const r=await fetch('/api/auth/'+(authKind==='login'?'login':'register'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'로그인 실패');await afterLogin(d.user)}catch(e){authMsg.textContent=e.message}}
-async function afterLogin(user){who.textContent=(user?.name||'학생')+'님';authGate.style.display='none';try{const r=await fetch('/api/state');if(r.ok){const d=await r.json();state=d.state||state;normalizeState();applyDefaultScopes();localStorage.setItem(SKEY,JSON.stringify(state));}}catch{}renderExam();renderMaterials();renderTopics();renderAnalysisHistory();renderWrong();renderFinal()}
+async function afterLogin(user){who.textContent=(user?.name||'학생')+'님';authGate.style.display='none';try{const r=await fetch('/api/state');if(r.ok){const d=await r.json();state=d.state||state;normalizeState();applyDefaultScopes();localStorage.setItem(SKEY,JSON.stringify(state));}}catch{}renderExam();renderSubjectOptions();renderMaterials();renderStudySubject();renderTopics();renderAnalysisHistory();renderWrong();renderFinal()}
 async function logout(){try{await fetch('/api/auth/logout',{method:'POST'})}catch{}authGate.style.display='flex';who.textContent='';authPassword.value='';authMsg.textContent='로그아웃되었습니다.'}
 async function bootAuth(){try{const r=await fetch('/api/auth/me');if(r.ok){const d=await r.json();await afterLogin(d.user)}}catch{}}
 materialSubject?.addEventListener('change',updateSelectedRange);

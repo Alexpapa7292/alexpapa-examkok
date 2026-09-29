@@ -168,6 +168,15 @@ function extractOutputText(response) {
   return outputText.trim();
 }
 
+function parseRetrySeconds(message="") {
+  const m=String(message).match(/try again in\s*(?:(\d+)h)?(?:(\d+)m)?([\d.]+)s/i);
+  if(!m) return null;
+  return (Number(m[1]||0)*3600)+(Number(m[2]||0)*60)+Math.ceil(Number(m[3]||0));
+}
+function aiHttpError(message, status=500) {
+  const e=new Error(message||"AI 분석 실패"); e.status=status; e.retryAfterSeconds=parseRetrySeconds(message); return e;
+}
+
 async function createStructuredResponse({ model, content, schemaName, schema, maxOutputTokens = 7000 }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 105000);
@@ -194,7 +203,7 @@ async function createStructuredResponse({ model, content, schemaName, schema, ma
       })
     });
     const response = await rr.json();
-    if (!rr.ok) throw new Error(response?.error?.message || "AI 분석 실패");
+    if (!rr.ok) throw aiHttpError(response?.error?.message || "AI 분석 실패", rr.status);
     if (response.status === "incomplete") {
       throw new Error(`AI 응답이 완성되기 전에 중단되었습니다. ${response?.incomplete_details?.reason || "출력 길이 초과 가능성"}`);
     }
@@ -246,6 +255,17 @@ const practiceSchema = {
   }
 };
 
+const sourceDigestSchema = {
+  type:"object", additionalProperties:false, required:["source_title","source_kind","scope_match","sections","key_facts","teacher_emphasis","questions","limitations"], properties:{
+    source_title:{type:"string"}, source_kind:{type:"string"}, scope_match:{type:"string"},
+    sections:{type:"array",items:{type:"object",additionalProperties:false,required:["title","summary"],properties:{title:{type:"string"},summary:{type:"string"}}}},
+    key_facts:{type:"array",items:{type:"string"}},
+    teacher_emphasis:{type:"array",items:{type:"string"}},
+    questions:{type:"array",items:{type:"object",additionalProperties:false,required:["number","focus"],properties:{number:{type:"string"},focus:{type:"string"}}}},
+    limitations:{type:"string"}
+  }
+};
+
 const CONFIRMED_REFERENCE_MATERIALS={
   "공통수학2": [
     "마더텅 기출문제집 원본 확인. 시험범위는 p4 평면좌표부터 p165 집합, 그리고 p304~p321. 확인된 초반 내용에는 평면좌표, 두 점 사이의 거리, 선분의 내분, 삼각형의 무게중심 문제 등이 포함된다."
@@ -263,7 +283,7 @@ const CONFIRMED_REFERENCE_MATERIALS={
 };
 function confirmedReferenceText(subject){return (CONFIRMED_REFERENCE_MATERIALS[subject]||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");}
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"1.0.0" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"10.1" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
@@ -278,13 +298,32 @@ app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req
     const model = process.env.OPENAI_MODEL || "gpt-6-luna";
     const fileContent = uploaded.map(f => ({ type: "input_file", file_id: f.id }));
 
+    let sourceDigest = null;
+    if (files.length) {
+      const digestPrompt = `한국 고등학교 시험공부용 원자료를 읽고, 이후 과외노트 생성에 필요한 사실만 압축 추출하세요.
+과목: ${subject}
+자료 종류: ${materialType}
+시험 범위: ${examRange || "미입력"}
+사용자 메모: ${memo || "없음"}
+
+중요:
+- 첨부파일을 읽는 호출은 이번 1회뿐이므로 범위 안 핵심 사실과 단원 구조를 빠뜨리지 마세요.
+- 전국연합학력평가/모의고사이면 시험범위에 지정된 문항 번호를 우선 식별하고, 각 문항의 핵심 독해·문법·개념 포인트를 questions에 기록하세요.
+- 선생님 필기, 빈칸, 별표, 반복, 정답 표시 등 강조 흔적이 보이면 teacher_emphasis에 기록하세요.
+- 파일에서 확인되지 않는 내용은 만들지 마세요.
+- 이후 단계가 이 요약만 보고도 충분히 과외노트를 만들 수 있도록 구체적으로 작성하되 장황한 원문 복사는 피하세요.`;
+      sourceDigest = await createStructuredResponse({model,content:[{type:"input_text",text:digestPrompt},...fileContent],schemaName:"examkok_source_digest",schema:sourceDigestSchema,maxOutputTokens:3600});
+    }
+    const digestText = sourceDigest ? JSON.stringify(sourceDigest) : "첨부 원본 없음";
+
     const sharedRules = `당신은 한국 고등학교 1학년 학생에게 과목을 처음부터 이해시키는 친절하고 꼼꼼한 1:1 과외 선생님입니다.
 과목: ${subject}
 자료 종류: ${materialType}
 시험 범위: ${examRange || "미입력"}
 확인된 교과서 정보: ${textbookInfo || "미등록"}
 확인된 학교자료 참고정보: ${confirmedReference || "미등록"}
-첨부자료 상태: ${files.length ? `첨부 ${files.length}개 있음` : "첨부 없음 - 시험범위와 교과 일반지식 기반으로 설명"}
+첨부 원자료 1차 압축노트: ${digestText}
+첨부자료 상태: ${files.length ? `첨부 ${files.length}개 읽기 완료` : "첨부 없음 - 시험범위와 교과 일반지식 기반으로 설명"}
 사용자 메모: ${memo || "없음"}
 
 공통 원칙:
@@ -298,21 +337,21 @@ app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req
     const lessonPrompt = sharedRules + `\n\n[1차: 이해 중심 심화 설명]\n짧은 요약문으로 끝내지 마세요. summary 7~10문장, overview 7~10개, easy_lessons 6~9개를 작성하세요. easy_lessons마다 쉬운 설명은 최소 4~7문장으로 하고, 반드시 왜 배우는지·과정/원리·대표 예시·용어 풀이·이해확인 질문을 포함하세요. 시험범위가 넓으면 큰 단원을 빠뜨리지 말고 고르게 다루세요. coverage_note에는 첨부 유무와 근거의 한계를 명확히 적으세요.`;
     let lessons;
     try {
-      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:lessonPrompt},...fileContent],schemaName:"examkok_lessons",schema:lessonSchema,maxOutputTokens:7600});
+      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:lessonPrompt}],schemaName:"examkok_lessons",schema:lessonSchema,maxOutputTokens:7600});
     } catch(e) {
       const msg=String(e?.message||"");
       if(!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw e;
-      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[1차 재시도]\nsummary 6문장, overview 6개, easy_lessons 정확히 5개. 각 쉬운 설명은 3~5문장으로 핵심을 빠짐없이 설명하세요.`},...fileContent],schemaName:"examkok_lessons_compact",schema:lessonSchema,maxOutputTokens:6500});
+      lessons = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[1차 재시도]\nsummary 6문장, overview 6개, easy_lessons 정확히 5개. 각 쉬운 설명은 3~5문장으로 핵심을 빠짐없이 설명하세요.`}],schemaName:"examkok_lessons_compact",schema:lessonSchema,maxOutputTokens:6500});
     }
 
     const conceptPrompt = sharedRules + `\n\n[2차: 시험 핵심 심화 정리]\n시험 대비용으로 topics 8~12개, comparisons 2~4개, traps 4~7개를 작성하세요. 각 topic은 정의만 한 줄 쓰지 말고 원리/흐름을 3~6문장으로 설명하세요. exam_point는 실제 시험에서 무엇을 구분하고 어떤 식으로 묻기 쉬운지 구체적으로 쓰세요. 반드시 외워야 하거나 출제 가능성이 높은 내용은 importance 5로 표시하세요. common_trap에는 학생이 흔히 틀리는 구분을 구체적으로 적으세요.`;
     let concepts;
     try {
-      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:conceptPrompt},...fileContent],schemaName:"examkok_concepts",schema:conceptSchema,maxOutputTokens:7200});
+      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:conceptPrompt}],schemaName:"examkok_concepts",schema:conceptSchema,maxOutputTokens:7200});
     } catch(e) {
       const msg=String(e?.message||"");
       if(!/max_output_tokens|완성되기 전에 중단|출력 길이/i.test(msg)) throw e;
-      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[2차 재시도]\ntopics 정확히 7개, comparisons 최대 2개, traps 4개. 각 항목은 짧지만 시험에 필요한 원리와 구분을 반드시 포함하세요.`},...fileContent],schemaName:"examkok_concepts_compact",schema:conceptSchema,maxOutputTokens:6000});
+      concepts = await createStructuredResponse({model,content:[{type:"input_text",text:sharedRules+`\n\n[2차 재시도]\ntopics 정확히 7개, comparisons 최대 2개, traps 4개. 각 항목은 짧지만 시험에 필요한 원리와 구분을 반드시 포함하세요.`}],schemaName:"examkok_concepts_compact",schema:conceptSchema,maxOutputTokens:6000});
     }
     const teaching={...lessons,...concepts};
 
@@ -344,19 +383,22 @@ ${compactContext}
       teaching.coverage_note = `${teaching.coverage_note||''} 문제/암기카드 생성은 출력 한도 또는 시간 문제로 생략되었습니다. 핵심 설명은 정상 저장되었습니다.`.trim();
     }
 
-    const result = { ...teaching, ...practice };
+    const result = { ...teaching, ...practice, source_digest: sourceDigest };
     console.log(`[analyze] ok subject=${subject} files=${files.length} ms=${Date.now()-started}`);
     res.json({ ok: true, result, originals, analysis:{id:crypto.randomUUID(),subject,materialType,memo,examRange,textbookInfo,createdAt:new Date().toISOString(),fileCount:files.length,summary:result.summary||""} });
   } catch (e) {
     console.error(`[analyze] failed subject=${subject} files=${files.length} ms=${Date.now()-started}`, e);
-    res.status(500).json({ error: e.message || "분석 중 오류가 발생했습니다." });
+    if (Number(e?.status) === 429 || /rate limit|TPM|tokens per min/i.test(String(e?.message||""))) {
+      return res.status(429).json({ error:"OpenAI 사용량 한도에 도달했습니다. 앱 고장이 아닙니다. 한도가 회복된 뒤 다시 분석해주세요.", detail:e.message||"", retryAfterSeconds:e.retryAfterSeconds||null });
+    }
+    res.status(Number(e?.status)>=400&&Number(e?.status)<600?Number(e.status):500).json({ error: e.message || "분석 중 오류가 발생했습니다." });
   } finally {
     await Promise.all(uploaded.map(f => deleteOpenAIFile(f.id)));
   }
 });
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V10: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V10.1: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
