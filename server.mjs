@@ -76,7 +76,7 @@ function setSession(res,user){
 }
 function clearSession(res){ res.setHeader("Set-Cookie",`examkok_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${process.env.NODE_ENV==='production'?'; Secure':''}`); }
 function auth(req,res,next){ const s=readSession(req); if(!s) return res.status(401).json({error:"로그인이 필요합니다."}); req.user=s; next(); }
-function emptyState(){ return { exam:{}, materials:[], wrong:[], ai:null, analyses:[], stats:{attempts:0,correct:0,bySubject:{}} }; }
+function emptyState(){ return { exam:{}, materials:[], wrong:[], ai:null, analyses:[], stats:{attempts:0,correct:0,bySubject:{}}, studyItems:[], customSubjects:[] }; }
 
 async function getState(user){
   if(cloudEnabled){
@@ -283,7 +283,7 @@ const CONFIRMED_REFERENCE_MATERIALS={
 };
 function confirmedReferenceText(subject){return (CONFIRMED_REFERENCE_MATERIALS[subject]||[]).map((x,i)=>`${i+1}. ${x}`).join("\n");}
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"10.1" }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, ai: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6-luna", auth:true, storage:cloudEnabled?"supabase":"local", originals:cloudEnabled?`supabase:${STORAGE_BUCKET}`:"local-files", version:"11" }));
 
 app.post("/api/analyze", auth, requireKey, upload.array("files", 10), async (req, res) => {
   const files = req.files || [];
@@ -396,9 +396,71 @@ ${compactContext}
     await Promise.all(uploaded.map(f => deleteOpenAIFile(f.id)));
   }
 });
+
+
+const studyAnalysisSchema = {
+  type:"object", additionalProperties:false,
+  required:["classification","overview","lesson_sections","key_points","memorize_points","wrong_note","math_visual","math_similar","english","korean","quiz","limitations"],
+  properties:{
+    classification:{type:"object",additionalProperties:false,required:["subject","sub_subject","mode","title"],properties:{subject:{type:"string"},sub_subject:{type:"string"},mode:{type:"string"},title:{type:"string"}}},
+    overview:{type:"string"},
+    lesson_sections:{type:"array",items:{type:"object",additionalProperties:false,required:["title","explanation","exam_point"],properties:{title:{type:"string"},explanation:{type:"string"},exam_point:{type:"string"}}}},
+    key_points:{type:"array",items:{type:"string"}},
+    memorize_points:{type:"array",items:{type:"string"}},
+    wrong_note:{type:"object",additionalProperties:false,required:["status","error_type","where_wrong","why","fix","one_line_rule"],properties:{status:{type:"string",enum:["wrong","not_wrong","unknown"]},error_type:{type:"string"},where_wrong:{type:"string"},why:{type:"string"},fix:{type:"string"},one_line_rule:{type:"string"}}},
+    math_visual:{type:"object",additionalProperties:false,required:["kind","title","explanation","a","b","c","h","k","r","x_min","x_max","y_min","y_max"],properties:{kind:{type:"string",enum:["none","line","quadratic","circle"]},title:{type:"string"},explanation:{type:"string"},a:{type:"number"},b:{type:"number"},c:{type:"number"},h:{type:"number"},k:{type:"number"},r:{type:"number"},x_min:{type:"number"},x_max:{type:"number"},y_min:{type:"number"},y_max:{type:"number"}}},
+    math_similar:{type:"array",items:{type:"object",additionalProperties:false,required:["difficulty","question","hint","answer"],properties:{difficulty:{type:"string"},question:{type:"string"},hint:{type:"string"},answer:{type:"string"}}}},
+    english:{type:"object",additionalProperties:false,required:["natural_translation","issues","vocab","grammar"],properties:{natural_translation:{type:"string"},issues:{type:"array",items:{type:"object",additionalProperties:false,required:["original","problem","better"],properties:{original:{type:"string"},problem:{type:"string"},better:{type:"string"}}}},vocab:{type:"array",items:{type:"object",additionalProperties:false,required:["term","meaning"],properties:{term:{type:"string"},meaning:{type:"string"}}}},grammar:{type:"array",items:{type:"object",additionalProperties:false,required:["title","explanation"],properties:{title:{type:"string"},explanation:{type:"string"}}}}}},
+    korean:{type:"object",additionalProperties:false,required:["paragraph_notes","hidden_meanings","question_review"],properties:{paragraph_notes:{type:"array",items:{type:"object",additionalProperties:false,required:["part","explanation"],properties:{part:{type:"string"},explanation:{type:"string"}}}},hidden_meanings:{type:"array",items:{type:"object",additionalProperties:false,required:["expression","meaning"],properties:{expression:{type:"string"},meaning:{type:"string"}}}},question_review:{type:"array",items:{type:"object",additionalProperties:false,required:["question","explanation","core_point"],properties:{question:{type:"string"},explanation:{type:"string"},core_point:{type:"string"}}}}}},
+    quiz:{type:"array",items:{type:"object",additionalProperties:false,required:["q","answer","explanation"],properties:{q:{type:"string"},answer:{type:"string"},explanation:{type:"string"}}}},
+    limitations:{type:"string"}
+  }
+};
+
+function openAIInputParts(files, uploaded){
+  return uploaded.map((u,i)=>{
+    const m=String(files[i]?.mimetype||"");
+    if(m.startsWith("image/")) return {type:"input_image",file_id:u.id,detail:"auto"};
+    return {type:"input_file",file_id:u.id};
+  });
+}
+
+async function createTextResponse({model, text, maxOutputTokens=1400}){
+  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),75000);
+  try{
+    const rr=await fetch("https://api.openai.com/v1/responses",{method:"POST",signal:controller.signal,headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({model,max_output_tokens:maxOutputTokens,input:[{role:"user",content:[{type:"input_text",text}]}]})});
+    const d=await rr.json(); if(!rr.ok) throw aiHttpError(d?.error?.message||"AI 응답 실패",rr.status); const out=extractOutputText(d); if(!out)throw new Error("AI가 빈 답변을 반환했습니다."); return out;
+  }catch(e){if(e?.name==='AbortError')throw new Error('AI 응답 시간이 길어졌습니다. 다시 시도해주세요.');throw e}finally{clearTimeout(timer)}
+}
+
+app.post("/api/study/analyze",auth,requireKey,upload.array("files",10),async(req,res)=>{
+  const files=req.files||[]; const uploaded=[]; let originals=[]; const started=Date.now();
+  const requestedSubject=String(req.body?.subject||"자동"); const requestedMode=String(req.body?.mode||"자동"); const studentInput=String(req.body?.studentInput||""); const memo=String(req.body?.memo||"");
+  try{
+    if(!files.length)return res.status(400).json({error:"사진이나 파일을 먼저 올려주세요."});
+    originals=await saveOriginalFiles(req.user,files);
+    for(const f of files)uploaded.push(await uploadToOpenAI(f));
+    const model=process.env.OPENAI_MODEL||"gpt-6-luna";
+    const prompt=`당신은 한국 고등학생의 1:1 과외 선생님입니다. 첨부된 자료를 직접 읽고 한 번의 분석으로 공부노트를 만드세요.\n\n사용자 지정 과목: ${requestedSubject}\n사용자 지정 공부방식: ${requestedMode}\n학생이 적은 답/해석/메모: ${studentInput||"없음"}\n추가 요청: ${memo||"없음"}\n\n[자동 분류]\n- 과목은 국어/수학/영어/한국사/사회/과학/정보/제2외국어/한문/진로·선택/기타 중 가장 알맞게 분류합니다. 사용자가 과목을 명시했다면 그것을 우선합니다.\n- 자료가 문제풀이인지 교과서/개념자료인지, 학생의 손풀이/한글 번역이 있는지 판단해 mode를 정합니다.\n\n[공통]\n- 첨부에 실제로 보이는 내용만 근거로 분석하고, 불명확한 부분은 limitations에 적습니다.\n- 한 페이지씩 공부할 수 있도록 lesson_sections를 3~8개 정도로 나눠 쉽게 설명합니다.\n- key_points는 시험에 중요한 요점, memorize_points는 짧게 외울 내용입니다.\n- 학생 답/풀이가 보이면 wrong_note로 정확히 어느 지점에서 왜 틀렸는지 분석합니다. 오답이 없거나 판단 불가하면 status를 not_wrong 또는 unknown으로 둡니다.\n\n[수학]\n- 공식만 주지 말고 개념과 원리를 설명합니다. 학생 풀이가 있으면 풀이 흐름을 진단합니다.\n- 그래프가 학습에 도움이 될 때 math_visual을 사용합니다. 직선 y=ax+b는 line, 이차함수 y=ax^2+bx+c는 quadratic, 원 (x-h)^2+(y-k)^2=r^2는 circle. 숫자는 자료에 근거해 정확히 넣습니다. 필요 없으면 kind=none.\n- 오답 또는 대표 개념에 대해 math_similar를 쉬움/비슷함/어려움 수준으로 1~2개씩 만듭니다.\n\n[영어]\n- 학생이 한글 해석을 적었거나 이미지에 적혀 있으면 자연스러운 번역과 비교해 issues에 문제점을 적습니다.\n- 특히 잘못 이해한 단어는 vocab, 실제 문장에서 적용된 문법은 grammar에 정리합니다.\n\n[국어]\n- 문단/행/장면별 의미를 paragraph_notes로 설명하고, 비유·상징·화자의 태도·문맥의 숨은 의미는 hidden_meanings에 정리합니다.\n- 문제가 있으면 정답 근거와 오답 선택지가 왜 틀렸는지 question_review에 정리합니다.\n\n[암기 과목]\n- 한국사·사회·과학 등은 개념의 의미와 흐름을 풀어 설명하고, 핵심요점·반드시 암기·시험 포인트를 구분합니다.\n\n전체 내용은 학생이 원본과 함께 태블릿에서 공부하기 좋은 밀도로 작성하세요. 너무 장황한 원문 복사는 하지 마세요.`;
+    const result=await createStructuredResponse({model,content:[{type:"input_text",text:prompt},...openAIInputParts(files,uploaded)],schemaName:"examkok_study_v11",schema:studyAnalysisSchema,maxOutputTokens:6200});
+    const studyId=crypto.randomUUID();
+    res.json({ok:true,studyId,result,originals,elapsedMs:Date.now()-started});
+  }catch(e){console.error('[study/analyze]',e);if(Number(e?.status)===429||/rate limit|TPM|tokens per min/i.test(String(e?.message||"")))return res.status(429).json({error:"AI 사용량 한도에 잠시 도달했습니다. 원본은 저장되어 있으므로 잠시 뒤 다시 시도해주세요.",detail:e.message||""});res.status(Number(e?.status)>=400&&Number(e?.status)<600?Number(e.status):500).json({error:e.message||"분석 중 오류가 발생했습니다."});}
+  finally{await Promise.all(uploaded.map(f=>deleteOpenAIFile(f.id)))}
+});
+
+app.post("/api/study/tutor",auth,requireKey,async(req,res)=>{
+  try{
+    const question=String(req.body?.question||"").trim(); const context=req.body?.context||{}; if(!question)return res.status(400).json({error:"질문을 입력해주세요."});
+    const model=process.env.OPENAI_MODEL||"gpt-6-luna";
+    const text=`당신은 고등학생의 1:1 과외 선생님입니다. 아래는 이미 원본에서 추출해 저장한 공부노트입니다. 원본 파일을 다시 읽지 말고 이 문맥 안에서 학생 질문에 답하세요. 근거가 부족하면 부족하다고 말하세요. 수학은 원리와 풀이 순서를, 영어는 문장 구조와 단어 의미를, 국어는 본문 근거와 표현 의미를, 암기과목은 흐름과 구분을 중심으로 쉽게 설명하세요.\n\n[현재 공부노트]\n${JSON.stringify(context)}\n\n[학생 질문]\n${question}\n\n답변은 한국어로 3~10문장 정도, 필요하면 짧은 단계나 식을 사용하세요.`;
+    const answer=await createTextResponse({model,text,maxOutputTokens:1200}); res.json({ok:true,answer});
+  }catch(e){console.error('[study/tutor]',e);if(Number(e?.status)===429||/rate limit|TPM/i.test(String(e?.message||"")))return res.status(429).json({error:"AI 사용량 한도에 잠시 도달했습니다. 잠시 뒤 다시 질문해주세요."});res.status(500).json({error:e.message||"질문 처리 중 오류가 발생했습니다."})}
+});
+
 app.use((err, _req, res, _next) => { if (err?.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "파일 1개 크기는 최대 25MB입니다." }); if (err?.code === "LIMIT_FILE_COUNT") return res.status(413).json({ error: "한 번에 최대 10개 파일까지 분석할 수 있습니다." }); console.error(err); res.status(500).json({ error: "서버에서 처리 중 오류가 발생했습니다." }); });
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V10.1: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
+const server = app.listen(port, "0.0.0.0", () => console.log(`Alexpapa 시험콕 V11 Study OS: http://0.0.0.0:${port} | storage=${cloudEnabled?'supabase':'local'}`));
 for (const signal of ["SIGTERM", "SIGINT"]) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
