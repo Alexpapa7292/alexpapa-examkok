@@ -7,6 +7,15 @@ function legacyScene(g={}){
   if(g.kind==='quadratic')scene.curves=[{a:g.a,b:g.b,c:g.c,label:'이차함수'}];
   if(g.kind==='circle')scene.circles=[{x:g.h,y:g.k,r:g.r,label:'원'}];return scene;
 }
+function hasGeometry(scene){
+  if(!scene||scene.status==='none')return false;
+  if(!valid(scene.x_min,scene.x_max,scene.y_min,scene.y_max)||scene.x_max<=scene.x_min||scene.y_max<=scene.y_min)return false;
+  return (scene.points||[]).some(p=>valid(p.x,p.y))||(scene.lines||[]).some(l=>valid(l.a,l.b,l.c)&&(l.a!==0||l.b!==0))||(scene.curves||[]).some(c=>valid(c.a,c.b,c.c))||(scene.circles||[]).some(c=>valid(c.x,c.y,c.r)&&c.r>0)||(scene.polygons||[]).some(p=>p.vertices?.length>=3&&p.vertices.every(v=>valid(v.x,v.y)))||(scene.segments||[]).some(s=>valid(s.x1,s.y1,s.x2,s.y2));
+}
+function selectScene(analysis={}){
+  if(hasGeometry(analysis.math_scene))return analysis.math_scene;
+  const legacy=legacyScene(analysis.math_visual);return hasGeometry(legacy)?legacy:analysis.math_scene||legacy;
+}
 function render(scene){
   if(!scene||scene.status==='none')return '<div class="notice">확인된 좌표·도형 정보가 없습니다. 원본을 보며 개념과 풀이를 공부하세요.</div>';
   let xmin=scene.x_min,xmax=scene.x_max,ymin=scene.y_min,ymax=scene.y_max;
@@ -46,5 +55,5 @@ function render(scene){
   for(const a of (scene.annotations||[]).slice(0,40))if(valid(a.x,a.y))labels+=text(sx(a.x),sy(a.y),a.text);
   return `<svg class="graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escape(scene.title||'AI 재구성 그래프·도형')}"><title>${escape(scene.title||'AI 재구성 그래프·도형')}</title><defs><clipPath id="sceneClip"><rect x="${ox}" y="${oy}" width="${(xmax-xmin)*scale}" height="${(ymax-ymin)*scale}"/></clipPath></defs>${grid}<g clip-path="url(#sceneClip)">${body}</g>${labels}</svg><div class="sub">${escape(scene.source_basis||'')}${scene.status==='partial'?' · 일부 정보만 확인됨':''}</div>${scene.uncertainty?`<div class="notice">확인 필요: ${escape(scene.uncertainty)}</div>`:''}`;
 }
-globalThis.ExamkokMath={render,legacyScene};
+globalThis.ExamkokMath={render,legacyScene,hasGeometry,selectScene};
 })();

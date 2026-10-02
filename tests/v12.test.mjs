@@ -28,6 +28,10 @@ test('all strict schema properties are required and unknown coordinates use null
 test('SVG supports vertical lines, zero coefficients, polygons and escaped labels',()=>{
  const s={...fixture.math_scene,lines:[{label:'vertical',a:1,b:0,c:-1}],curves:[{label:'zero',a:0,b:1,c:0}],circles:[{x:0,y:0,r:1,label:'circle'}],polygons:[{label:'triangle',vertices:[{x:0,y:0},{x:1,y:0},{x:0,y:1}]}],points:[{x:1,y:1,label:'<script>alert(1)</script>'}]};const svg=MathView.render(s);assert.match(svg,/<polygon/);assert.match(svg,/<circle/);assert.match(svg,/vertical/);assert.doesNotMatch(svg,/<script>/);assert.doesNotMatch(svg,/NaN|Infinity/);assert.match(MathView.render({...s,x_max:s.x_min}),/보류/);assert.match(MathView.render({...s,status:'none'}),/확인된/);
 });
+test('empty new scene does not hide a valid V11 graph; math subject variants render as math',()=>{
+ const a={math_scene:{status:'none',points:[],lines:[]},math_visual:{kind:'line',a:2,b:1,x_min:-6,x_max:6,y_min:-6,y_max:6}};assert.equal(MathView.hasGeometry(MathView.selectScene(a)),true);assert.match(MathView.render(MathView.selectScene(a)),/<svg/);
+ assert.equal(M.isMath('공통수학 2'),true);assert.equal(M.isMath('수학Ⅰ'),true);assert.equal(M.isMath('영어'),false);
+});
 test('HTTP regression: auth, state, originals, cache, scoped tutor and rate limits',{timeout:30000},async()=>{
  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');const dir=await mkdtemp(path.join(os.tmpdir(),'examkok-v12-test-'));const port=36000+Math.floor(Math.random()*10000);
  const proc=spawn(process.execPath,['--import','./tests/mock-openai.mjs','server.mjs'],{cwd:root,env:{...process.env,PORT:String(port),DATA_DIR:dir,NODE_ENV:'development',SESSION_SECRET:'test-session-secret',OPENAI_API_KEY:'test-only-placeholder',SUPABASE_URL:'',SUPABASE_PUBLISHABLE_KEY:'',SUPABASE_ANON_KEY:'',SUPABASE_SECRET_KEY:'',SUPABASE_SERVICE_ROLE_KEY:''},stdio:['ignore','pipe','pipe']});
@@ -53,11 +57,17 @@ test('HTTP regression: auth, state, originals, cache, scoped tutor and rate limi
   const latest=log.split('\n').filter(x=>x.startsWith('MOCK:response:')).at(-1);assert.doesNotMatch(latest,/ENGLISH_ROOM_SENTINEL/);assert.match(latest,/y 변화량/);
   assert.equal((await req('/api/study/tutor','POST',{...tutorBody,subject:'영어'})).status,400);
   assert.equal((await req('/api/study/tutor','POST',{...tutorBody,problemId:'unknown'})).status,400);
+  const visualReply=await (await req('/api/study/tutor','POST',{...tutorBody,question:'그래프로 설명해줘',visual:true})).json();assert.match(visualReply.answer,/기울기/);assert.equal(visualReply.scene.lines.length,1);
+  const visualCache=await (await req('/api/study/tutor','POST',{...tutorBody,question:'그래프로 설명해줘',visual:true})).json();assert.equal(visualCache.cached,true);assert.equal(visualCache.scene.lines.length,1);
+  s=(await (await req('/api/state')).json()).state;const existing=s.studyItems.find(x=>x.id===a.studyId);existing.analysis.math_scene={...fixture.math_scene,status:'none',points:[],lines:[]};existing.analysis.math_visual={kind:'none'};await req('/api/state','PUT',{state:s});
+  const visualRoute=`/api/study/${a.studyId}/math-visual`;const repaired=await (await req(visualRoute,'POST')).json();assert.equal(repaired.cached,false);assert.equal(repaired.visualStatus,'ready');assert.equal(repaired.scene.points.length,2);
+  const repairCount=count();const reused=await (await req(visualRoute,'POST')).json();assert.equal(reused.cached,true);assert.equal(count(),repairCount);assert.equal((await (await req('/api/state')).json()).state.studyItems.find(x=>x.id===a.studyId).analysis.math_scene.lines.length,1);
   const limited=await req('/api/study/analyze','POST',form('TEST_RATE_LIMIT'));assert.equal(limited.status,429);assert.equal(limited.headers.get('retry-after'),'2');
   s=(await (await req('/api/state')).json()).state;assert.equal(s.studyItems.length,2);
   await req('/api/auth/logout','POST');assert.equal((await req('/api/state','GET',null,'examkok_session=invalid')).status,401);
   const login=await req('/api/auth/login','POST',{email:'student@example.test',password:'test-password'});assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];assert.equal((await (await req('/api/state')).json()).state.tutorThreads[room].length,2);
   const other=await req('/api/auth/register','POST',{email:'other@example.test',password:'test-password'});const otherCookie=other.headers.get('set-cookie').split(';')[0];assert.equal((await req(url,'GET',null,otherCookie)).status,404);
+  assert.equal((await req(visualRoute,'POST',null,otherCookie)).status,404);
   await req('/api/materials/delete-originals','POST',{originals:a.originals});assert.equal((await req(url)).status,404);
  }finally{proc.kill();await new Promise(resolve=>{if(proc.exitCode!==null)resolve();else proc.once('exit',resolve);});await rm(dir,{recursive:true,force:true});}
 });

@@ -1,7 +1,7 @@
 # V12 배포 안내
 
 1. 기존 GitHub 저장소의 V11 커밋을 기록하거나 소스를 백업합니다. Supabase 데이터는 삭제하지 않습니다.
-2. `alexpapa_examkok_v12_STUDY_OS.zip`을 풉니다. ZIP 최상위에 `server.mjs`, `package.json`, `package-lock.json`, `lib/`, `public/`, `render.yaml`이 바로 있습니다.
+2. `alexpapa_examkok_v12_GRAPH_FIX.zip`을 풉니다. ZIP 최상위에 `server.mjs`, `package.json`, `package-lock.json`, `lib/`, `public/`, `render.yaml`이 바로 있습니다.
 3. 기존 `Alexpapa7292/alexpapa-examkok` 저장소 **루트**에 파일을 덮어씁니다. `lib/`도 함께 올리세요. ZIP 자체, `node_modules`, 실제 `.env`, `data`는 올리지 않습니다.
 4. Render의 **기존** `alexpapa-examkok` 서비스 환경변수를 유지합니다. 특히 SESSION_SECRET, Supabase URL·키·버킷은 기존 값으로 둡니다. 새 Supabase 프로젝트나 새 서비스로 바꾸지 않습니다.
 5. 커밋 후 자동 배포를 기다리거나 `Manual Deploy → Deploy latest commit`을 누릅니다. Build Command는 `npm ci`, Start Command는 `npm start`입니다. Dockerfile도 포함되어 있습니다.
@@ -27,3 +27,9 @@ V11 화면 대화는 원래 저장되지 않아 복원할 수 없습니다. V12 
 - 되돌리기: Render에서 V11 커밋으로 롤백합니다. V12 추가 JSON 필드는 데이터에 남습니다. 롤백 전 현재 학습 데이터를 백업하세요.
 
 실제 서비스 배포는 이 작업에서 실행하지 않았습니다. 로컬 검증은 모의 AI 응답·로컬 계정 저장 모드로 진행했습니다. 위 7~8번은 실제 환경의 연결과 분석을 확인하는 절차입니다.
+
+## 그래프 보완판 적용
+
+새 ZIP을 기존과 같은 방식으로 저장소 루트에 덮어쓰고 배포합니다. `public`과 `lib`, `server.mjs`를 모두 갱신하세요. 화면 버전은 V12를 유지하고 패키지 버전은 1.2.1입니다. 예전 노트에 그래프가 없으면 **원본으로 그래프 만들기**를 누르세요. 튜터는 질문을 입력한 뒤 **그래프로 설명**을 누르면 그림을 함께 저장합니다. 기존 대화의 글 답변이 자동으로 그림 답변으로 바뀌지는 않습니다.
+
+새 버전 확인: 사이드바에 **V12 · 그래프 보완**이 보이는지 확인하세요. `/api/health`의 build 값은 `12.1-graph`입니다.

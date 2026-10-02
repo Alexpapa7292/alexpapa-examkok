@@ -3,6 +3,7 @@ const M=ExamkokModel;
 let activeSubject='수학',tutorScope='material',activeProblem='';
 let saveQueue=Promise.resolve(),saveRevision=0;
 const tutorPending=new Map(),cooldowns=new Map(),tutorDrafts=new Map();let renderedRoomKey='';
+const mathVisualPending=new Set();
 const getInfo=M.info;
 const byRecent=items=>[...items].sort((a,b)=>new Date(b.lastStudiedAt||b.createdAt)-new Date(a.lastStudiedAt||a.createdAt));
 function normalize(){state=M.normalize(state);}
@@ -103,17 +104,41 @@ function evidenceView(a){return `<details class="evidence"><summary>설명 근�
 function quizView(a){return (a.quiz||[]).length?`<div class="note-box memory"><h3>개념을 이해했는지 확인하기</h3>${a.quiz.map(q=>`<p>${esc(q.q)}</p><details><summary>생각한 뒤 정답 확인</summary><p>${esc(q.answer)}</p><p>${esc(q.explanation)}</p></details>`).join('')}</div>`:'';}
 function practiceView(a){return `<div id="practiceBlock"><div class="section-title">난이도별 유사문제</div><div class="sub">AI가 새로 만든 연습문제입니다. 원본에서 발췌한 문제가 아닙니다.</div><div class="practice-grid">${(a.math_similar||[]).map(q=>`<div class="practice"><div class="diff">${esc(q.difficulty)}</div><p>${esc(q.question)}</p><details><summary>힌트</summary><p>${esc(q.hint)}</p></details><details><summary>정답</summary><p>${esc(q.answer)}</p></details></div>`).join('')||'<div class="empty">저장된 유사문제가 없습니다. 튜터에게 연습문제를 요청할 수 있습니다.</div>'}</div></div>`;}
 function mathNotebook(a){
-  const i=getInfo(currentItem),scene=a.math_scene||ExamkokMath.legacyScene(a.math_visual);
+  const i=getInfo(currentItem),scene=ExamkokMath.selectScene(a);
   return `<div class="eyebrow">MATH NOTEBOOK</div><h2>${esc(i.title)}</h2><div class="tags"><span class="tag">${esc(i.subject)}</span><span class="tag">${esc(i.unit)}</span><span class="tag">${esc(i.material)}</span></div><p class="lead">${esc(a.overview||'')}</p><div class="math-compare"><div><div class="section-title">원본 문제</div>${originalView(currentItem)}</div><div><div class="section-title">AI 재구성 그래프 · 도형</div><div class="sub">확인된 좌표와 조건을 바탕으로 재구성한 그림</div>${ExamkokMath.render(scene)}${(a.unreadable_coordinates||[]).map(p=>`<div class="notice">확인 필요 · ${esc(p.label)}: ${esc(p.reason)}</div>`).join('')}</div></div><div class="section-title">핵심 개념과 원리 · 왜 이렇게 풀까요?</div>${list(a.lesson_sections,'concept')}${list(a.key_points,'key')}<div class="section-title">단계별 풀이</div><div class="steps">${(a.math_steps||[]).map((s,n)=>`<details class="step" open><summary><span>${n+1}</span>${esc(s.title)}${s.problem_id?` <small>${esc(s.problem_id)}</small>`:''}</summary><p>${esc(s.explanation)}</p>${s.formula?`<div class="formula">${esc(s.formula)}</div>`:''}<div class="sub">근거: ${esc(s.source_basis)}</div></details>`).join('')||'<div class="notice">이전 분석에는 단계별 풀이가 없습니다. 개념노트를 참고하거나 현재 자료 튜터에게 풀이 원리를 질문하세요.</div>'}</div><div class="section-title">오답과 교정</div>${renderWrongSummary(a.wrong_note)}${a.wrong_note?.why?`<div class="note-box">${esc(a.wrong_note.why)}</div>`:''}${quizView(a)}${practiceView(a)}${evidenceView(a)}`;
 }
 function renderWorkspace(){
   $('workspaceCrumb').textContent=currentItem?`${activeSubject} / ${getInfo(currentItem).unit} / ${getInfo(currentItem).material}`:activeSubject+' / 전체 질문';
   if(!currentItem){$('lessonNav').innerHTML='';$('paper').innerHTML=`<div class="eyebrow">SUBJECT TUTOR</div><h2>${iconFor(activeSubject)} ${esc(activeSubject)} 전체 질문</h2><p class="lead">개념과 원리를 편하게 물어보세요.<br>자료를 열면 해당 자료와 문제의 대화를 따로 이어갈 수 있어요.</p><button class="primary" data-action="capture-subject">새 자료로 공부하기</button>`;}
   else{const a=currentItem.analysis||{},defs=sectionDefs(a);if(!defs.some(d=>d[0]===currentSection))currentSection='overview';$('lessonNav').innerHTML=defs.map(([k,l])=>`<button class="${k===currentSection?'on':''}" data-action="section" data-section="${esc(k)}">${esc(l)}</button>`).join('');
-    $('paper').innerHTML=getInfo(currentItem).subject==='수학'?mathNotebook(a):renderSection(a,currentSection)+quizView(a)+evidenceView(a)+`<details><summary>원본 자료 보기</summary>${originalView(currentItem)}</details>`;
+    const math=M.isMath(getInfo(currentItem).subject);
+    $('paper').innerHTML=math?mathNotebook(a):renderSection(a,currentSection)+quizView(a)+evidenceView(a)+`<details><summary>원본 자료 보기</summary>${originalView(currentItem)}</details>`;
+    if(math){
+      const panel=document.querySelector('.math-compare>div:last-child');
+      if(!ExamkokMath.hasGeometry(ExamkokMath.selectScene(a))){
+        const checked=currentItem.mathVisualStatus==='checked-no-geometry';
+        const box=document.createElement('div');box.className='notice math-repair';
+        const note=document.createElement('p');note.textContent=checked?(currentItem.mathVisualNote||'원본에서 그릴 수 있는 좌표·도형 정보를 확인하지 못했습니다.'):'저장된 분석에 그래프가 없습니다. 원본에서 그래프 정보만 확인해 보완할 수 있습니다.';box.appendChild(note);
+        if(!checked){const button=document.createElement('button');button.className='primary';button.textContent=mathVisualPending.has(currentItem.id)?'그래프를 확인하고 있습니다…':'원본으로 그래프 만들기';button.disabled=mathVisualPending.has(currentItem.id);button.onclick=()=>buildMathVisual(currentItem.id);box.appendChild(button);}
+        panel.appendChild(box);
+      }
+    }
   }
   renderChat();
-  if(currentItem&&getInfo(currentItem).subject==='수학'&&currentSection==='practice')$('practiceBlock')?.scrollIntoView({behavior:'smooth',block:'start'});
+  if(currentItem&&M.isMath(getInfo(currentItem).subject)&&currentSection==='practice')$('practiceBlock')?.scrollIntoView({behavior:'smooth',block:'start'});
+  if(currentItem&&M.isMath(getInfo(currentItem).subject)&&currentSection==='math')document.querySelector('.math-compare')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function buildMathVisual(id){
+  if(mathVisualPending.has(id))return;const key='visual:'+id;
+  if(Date.now()<(cooldowns.get(key)||0)){toast('사용량 한도 대기 중입니다. 잠시 뒤 다시 시도해주세요.');return;}
+  mathVisualPending.add(id);renderWorkspace();
+  try{
+    await persist();const d=await api(`/api/study/${encodeURIComponent(id)}/math-visual`,{method:'POST'});
+    const target=state.studyItems.find(x=>x.id===id);if(!target)return;
+    target.analysis.math_scene=d.scene;target.mathVisualStatus=d.visualStatus;target.mathVisualNote=d.note||'';await persist();
+    toast(ExamkokMath.hasGeometry(d.scene)?'그래프를 보완하고 저장했습니다.':'확인 가능한 좌표·도형 정보가 없어 그래프를 만들지 않았습니다.');
+  }catch(e){if(e.status===429)cooldowns.set(key,Date.now()+(e.retryAfterSeconds||60)*1000);toast(e.message);}
+  finally{mathVisualPending.delete(id);if(currentItem?.id===id)renderWorkspace();}
 }
 function showSection(s){currentSection=s;renderWorkspace();}
 function roomKey(){return M.room(activeSubject,tutorScope,currentItem?.id,activeProblem);}
@@ -129,21 +154,24 @@ function renderChat(){
   if(key!==renderedRoomKey){if(renderedRoomKey)tutorDrafts.set(renderedRoomKey,$('chatInput').value);$('chatInput').value=tutorDrafts.get(key)||'';renderedRoomKey=key;}
   $('chat').innerHTML='';
   if(!messages.length)addBubble(tutorScope==='subject'?`${activeSubject}의 개념과 원리를 물어보세요. 이 과목의 대화는 별도로 저장됩니다.`:'현재 자료의 개념·원리와 풀이를 물어보세요. 확인된 근거가 부족하면 확인 필요로 안내합니다.','ai');
-  for(const m of messages)addBubble(m.text,m.role==='user'?'me':'ai');
+  for(const m of messages){addBubble(m.text,m.role==='user'?'me':'ai');if(m.role==='assistant'&&m.scene){const visual=document.createElement('div');visual.className='chat-visual';visual.innerHTML='<div class="row-label">AI 재구성 · 답변의 근거 조건</div>'+ExamkokMath.render(m.scene);$('chat').appendChild(visual);}}
+  $('graphTutorBtn').classList.toggle('hidden',!M.isMath(activeSubject));
   if(tutorPending.has(key))addBubble('근거를 확인하며 설명하고 있습니다…','ai','typing');
   document.querySelector('.chat-input button').disabled=tutorPending.has(key);
+  $('chat').scrollTop=$('chat').scrollHeight;
 }
-async function sendTutor(){
+async function sendTutor(visual=false){
   const q=$('chatInput').value.trim(),key=roomKey();if(!q||tutorPending.has(key))return;
   if(Date.now()<(cooldowns.get(key)||0)){toast('사용량 한도 대기 중입니다. 잠시 뒤 질문해주세요.');return;}
   const subject=activeSubject,scope=tutorScope,studyId=scope==='material'?currentItem?.id:'',problemId=scope==='material'?activeProblem:'';
   const thread=state.tutorThreads[key]||(state.tutorThreads[key]=[]);thread.push({role:'user',text:q,createdAt:new Date().toISOString()});$('chatInput').value='';tutorPending.set(key,true);renderChat();
   try{
-    await persist();const d=await api('/api/study/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,subject,scope,studyId,problemId})});
-    if(state.tutorThreads[key]===thread){thread.push({role:'assistant',text:d.answer,createdAt:new Date().toISOString()});if(thread.length>200)thread.splice(0,thread.length-200);await persist();}
+    await persist();const d=await api('/api/study/tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,subject,scope,studyId,problemId,visual})});
+    if(state.tutorThreads[key]===thread){thread.push({role:'assistant',text:d.answer,...(d.scene?{scene:d.scene}:{}),createdAt:new Date().toISOString()});if(thread.length>200)thread.splice(0,thread.length-200);await persist();}
   }catch(e){if(e.status===429)cooldowns.set(key,Date.now()+(e.retryAfterSeconds||60)*1000);if(state.tutorThreads[key]===thread){thread.push({role:'assistant',text:e.message,error:true,createdAt:new Date().toISOString()});persist().catch(()=>{});}}
   finally{tutorPending.delete(key);if(roomKey()===key)renderChat();}
 }
+function askGraph(){if(!$('chatInput').value.trim())$('chatInput').value=currentItem&&tutorScope==='material'?'현재 문제를 그래프나 도형으로 보여주고, 왜 그렇게 풀리는지 개념과 원리를 설명해줘.':'그래프로 이해하고 싶은 식이나 문제 조건을 적지 않았습니다. 먼저 필요한 조건을 물어봐줘.';sendTutor(true);}
 function editMetadata(){
   if(!currentItem)return;const i=getInfo(currentItem);const unit=prompt('단원 이름 (직접 지정)',i.unit);if(unit===null)return;const material=prompt('자료 이름 (직접 지정)',i.material);if(material===null)return;const subject=prompt('과목 이름 (직접 지정)',i.subject);if(subject===null)return;
   currentItem.unit=unit.trim()||'미분류';currentItem.materialName=material.trim()||'이름 없는 자료';currentItem.subject=M.subject(subject.trim()||i.subject);

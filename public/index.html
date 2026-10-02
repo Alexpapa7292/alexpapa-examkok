@@ -32,7 +32,7 @@
 
 <div class="app">
 <aside class="sidebar">
-  <div class="brand">🎓 시험콕 <span>V12 · AI 학습 시스템</span></div>
+  <div class="brand">🎓 시험콕 <span>V12 · 그래프 보완</span></div>
   <nav class="nav">
     <button class="on" data-screen="home" onclick="go('home')"><span>⌂</span> 홈</button>
     <button data-screen="capture" onclick="go('capture')"><span>📷</span> 찍어공부</button>
@@ -73,7 +73,7 @@
     <div class="workspace-toolbar"><button class="ghost" onclick="openSubject(activeSubject)">← 과목 홈</button><span id="workspaceCrumb"></span><button class="ghost" onclick="editMetadata()">분류 수정</button></div><div class="workspace">
       <div class="left card"><div class="section-title">공부 목차</div><div id="lessonNav" class="lesson-nav"></div></div>
       <div class="center"><div id="paper" class="paper"><div class="empty">자료를 분석하면 여기에 노트형 공부 화면이 만들어집니다.</div></div></div>
-      <div class="tutor"><div class="tutor-card"><div class="tutor-head">✨ AI 튜터 <div id="tutorRoomLabel" class="sub"></div><div class="room-tabs"><button id="subjectRoomBtn" onclick="setTutorScope('subject')">과목 전체</button><button id="materialRoomBtn" onclick="setTutorScope('material')">현재 자료</button></div><select id="problemSelect" aria-label="문제별 대화" onchange="selectProblem(this.value)"></select></div><div id="chat" class="chat"><div class="bubble ai">궁금한 부분을 바로 물어보세요. 원본 파일을 다시 읽지 않고 현재 공부노트를 기준으로 설명합니다.</div></div><div class="suggests"><button onclick="askQuick('더 쉽게 설명해줘')">더 쉽게</button><button onclick="askQuick('예시를 들어 설명해줘')">예시</button><button onclick="askQuick('시험에 어떻게 나오는지 알려줘')">시험 포인트</button><button onclick="askQuick('비슷한 문제 하나 내줘')">비슷한 문제</button></div><div class="chat-input"><input id="chatInput" placeholder="여기에 질문하세요" onkeydown="if(event.key==='Enter')sendTutor()"><button onclick="sendTutor()">전송</button></div></div></div>
+      <div class="tutor"><div class="tutor-card"><div class="tutor-head">✨ AI 튜터 <div id="tutorRoomLabel" class="sub"></div><div class="room-tabs"><button id="subjectRoomBtn" onclick="setTutorScope('subject')">과목 전체</button><button id="materialRoomBtn" onclick="setTutorScope('material')">현재 자료</button></div><select id="problemSelect" aria-label="문제별 대화" onchange="selectProblem(this.value)"></select></div><div id="chat" class="chat"><div class="bubble ai">궁금한 부분을 바로 물어보세요. 원본 파일을 다시 읽지 않고 현재 공부노트를 기준으로 설명합니다.</div></div><div class="suggests"><button id="graphTutorBtn" class="hidden" onclick="askGraph()">그래프로 설명</button><button onclick="askQuick('더 쉽게 설명해줘')">더 쉽게</button><button onclick="askQuick('예시를 들어 설명해줘')">예시</button><button onclick="askQuick('시험에 어떻게 나오는지 알려줘')">시험 포인트</button><button onclick="askQuick('비슷한 문제 하나 내줘')">비슷한 문제</button></div><div class="chat-input"><input id="chatInput" placeholder="여기에 질문하세요" onkeydown="if(event.key==='Enter')sendTutor()"><button onclick="sendTutor()">전송</button></div></div></div>
     </div>
   </section>
 
